@@ -74,7 +74,30 @@ export default {
     } else {
       axios.defaults.headers.common['Authorization'] = ''
     }
-}
+  },
+  mounted(){
+    setInterval(()=> {
+      this.getAccess()
+    }, 50000)
+
+  },
+  methods: {
+    getAccess(e){
+      const accessData = {
+        refresh: this.$store.state.refresh
+      }
+      axios
+        .post("/auth/jwl/refresh", accessData)
+        .then(response => {
+          const access = response.data.access
+          localStorage.setItem("access", access)
+          this.$store.commit("setAccess", access)
+        })
+        .catch(error =>{
+          console.log(error)
+        })
+    }
+  }
 }
 </script>
 

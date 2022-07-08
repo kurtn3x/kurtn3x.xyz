@@ -1,5 +1,3 @@
-
-
 <template>
   <div class="col-md-12">
     <div class="card card-container">
@@ -8,7 +6,7 @@
         src="//ssl.gstatic.com/accounts/ui/avatar_2x.png"
         class="profile-img-card"
       />
-      <Form @submit="submitForm" :validation-schema="schema">
+      <Form @submit="handleLogin" :validation-schema="schema">
         <div class="form-group">
           <label for="username">Username</label>
           <Field name="username" type="text" class="form-control" />
@@ -59,31 +57,45 @@ export default {
       });
       return {
         username:'',
-        password:'',    
+        password:'',
+        loading: false,
+        message: "",
+        schema,    
         }
     },
     methods: {
-        submitForm(e){
+        handleLogin(user){
+          this.loading = true;
             const formData = {
-                username: this.username,
-                password: this.password
+                username: user.username,
+                password: user.password
             }
 
             axios
                 .post('/auth/jwt/create', formData)
                 .then( response => {
+                    this.loading=false;
                     const access = response.data.access
+                    const refresh = response.data.refresh
 
                     this.$store.commit('setAccess', access)
+                    this.$store.commit('setRefresh', refresh)
 
-                    axios.defaults.headers.common['Authorization'] = 'JWT ' + token
+                    axios.defaults.headers.common['Authorization'] = 'JWT ' + access
                     localStorage.setItem("access", access)
-                    this.$router.push("/")
+                    localStorage.setItem("refresh", refresh)
+                    this.$router.push("/home/")
                 })
                 .catch(error => {
-                    console.log(error)
+                this.loading = false;
+                this.message =
+                  (error.response &&
+                    error.response.data &&
+                    error.response.data.message) ||
+                  error.message ||
+                  error.toString();
                 })
-        }
+          } 
     }
 }
 </script>

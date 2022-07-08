@@ -3,7 +3,7 @@ import { createStore, storeKey } from 'vuex'
 export default createStore({
   state: {
     access: '',
-    refresh: false,
+    refresh: '',
   },
   getters: {
   },
@@ -11,9 +11,11 @@ export default createStore({
     initializeStore(state){
       if ( localStorage.getItem('access')){
         state.access = localStorage.getItem('access')
+        state.refresh = localStorage.getItem('refresh')
         // state.isAuthenticated = true
       } else {
         state.access = ''
+        state.refresh = ''
         // state.isAuthenticated = false
       }
     },
@@ -21,9 +23,8 @@ export default createStore({
       state.access = access
       // state.isAuthenticated = true
     },
-    removeToken(state){
-      state.token = ''
-      state.isAuthenticated = false
+    setRefresh(state,refresh){
+      state.refresh= refresh
     }
   },
   actions: {
