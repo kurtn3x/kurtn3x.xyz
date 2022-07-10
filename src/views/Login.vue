@@ -65,14 +65,17 @@ export default {
     },
     methods: {
         handleLogin(user){
-          this.loading = true;
+          axios.defaults.headers.common['Authorization'] = ''
+          localStorage.removeItem('access')
+          // this.loading = true;
+
             const formData = {
                 username: user.username,
                 password: user.password
             }
 
             axios
-                .post('/auth/jwt/create', formData)
+                .post('/auth/jwt/create/', formData)
                 .then( response => {
                     this.loading=false;
                     const access = response.data.access
@@ -80,10 +83,13 @@ export default {
 
                     this.$store.commit('setAccess', access)
                     this.$store.commit('setRefresh', refresh)
+                    this.$store.commit('setIsLogged', true)
 
                     axios.defaults.headers.common['Authorization'] = 'JWT ' + access
                     localStorage.setItem("access", access)
                     localStorage.setItem("refresh", refresh)
+                    localStorage.setItem("isLogged", true)
+
                     this.$router.push("/home/")
                 })
                 .catch(error => {

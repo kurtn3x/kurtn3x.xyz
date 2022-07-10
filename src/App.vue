@@ -21,9 +21,6 @@
         <li v-if="showModeratorBoard" class="nav-item">
           <router-link to="/mod" class="nav-link">Moderator Board</router-link>
         </li>
-        <li class="nav-item">
-          <router-link v-if="currentUser" to="/user" class="nav-link">User</router-link>
-        </li>
       </div>
 
       <div v-if="!currentUser" class="navbar-nav ml-auto">
@@ -41,15 +38,9 @@
 
       <div v-if="currentUser" class="navbar-nav ml-auto">
         <li class="nav-item">
-          <router-link to="/profile" class="nav-link">
-            <font-awesome-icon icon="user" />
-            {{ currentUser.username }}
-          </router-link>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" @click.prevent="logOut">
+          <button class="nav-link" @click="logout">
             <font-awesome-icon icon="sign-out-alt" /> LogOut
-          </a>
+          </button>
         </li>
       </div>
     </nav>
@@ -64,13 +55,17 @@
 import axios from 'axios'
 export default {
   name: 'App',
+  computed: {
+    currentUser() {
+      return this.$store.state.isLogged;
+    },
+  },
   beforeCreate(){
     this.$store.commit('initializeStore')
     const access = this.$store.state.access
 
     if (access) {
       axios.defaults.headers.common['Authorization'] = 'JWT ' + access
-
     } else {
       axios.defaults.headers.common['Authorization'] = ''
     }
@@ -83,22 +78,36 @@ export default {
   },
   methods: {
     getAccess(e){
-      const accessData = {
-        refresh: this.$store.state.refresh
+      if (this.$store.state.isLogged){
+        const accessData = {
+          refresh: this.$store.state.refresh
+        }
+        axios
+          .post("/auth/jwt/refresh", accessData)
+          .then(response => {
+            const access = response.data.access
+            localStorage.setItem("access", access)
+            this.$store.commit("setAccess", access)
+            this.$store.commit("setIsLogged", true)
+
+          })
+          .catch(error =>{
+            console.log(error)
+          })
       }
-      axios
-        .post("/auth/jwl/refresh", accessData)
-        .then(response => {
-          const access = response.data.access
-          localStorage.setItem("access", access)
-          this.$store.commit("setAccess", access)
-        })
-        .catch(error =>{
-          console.log(error)
-        })
+    },
+    logout(){
+            this.$store.commit('setAccess', '')
+            this.$store.commit('setRefresh', '')
+            this.$store.commit('setIsLogged', false)
+            axios.defaults.headers.common['Authorization'] = ''
+            localStorage.setItem("access", '')
+            localStorage.setItem("refresh", '')
+            localStorage.setItem("isLogged", false)
     }
   }
 }
+// }
 </script>
 
 

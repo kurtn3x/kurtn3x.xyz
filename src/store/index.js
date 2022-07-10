@@ -4,6 +4,7 @@ export default createStore({
   state: {
     access: '',
     refresh: '',
+    isLogged : false,
   },
   getters: {
   },
@@ -12,10 +13,12 @@ export default createStore({
       if ( localStorage.getItem('access')){
         state.access = localStorage.getItem('access')
         state.refresh = localStorage.getItem('refresh')
+        state.isLogged = true
         // state.isAuthenticated = true
       } else {
         state.access = ''
         state.refresh = ''
+        state.isLogged = false
         // state.isAuthenticated = false
       }
     },
@@ -25,6 +28,9 @@ export default createStore({
     },
     setRefresh(state,refresh){
       state.refresh= refresh
+    },
+    setIsLogged(state, logged){
+      state.isLogged = logged
     }
   },
   actions: {

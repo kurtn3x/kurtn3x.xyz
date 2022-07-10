@@ -7,7 +7,7 @@ import "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { FontAwesomeIcon } from './plugins/font-awesome'
 
-
-axios.defaults.baseURL = 'http://127.0.0.1:8000'
+// CHANGE BASE URL DEPENDING ON PRODUCTION OR DEVELOPEMENT
+axios.defaults.baseURL = 'https://api.kurtn3x.xyz'
 
 createApp(App).use(store).use(router, axios).mount('#app')
