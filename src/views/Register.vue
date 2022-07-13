@@ -50,6 +50,7 @@
 
 
 <script>
+import VueCookies from 'vue-cookies'
 import axios from 'axios'
 import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
@@ -59,6 +60,19 @@ export default {
         Form,
         Field,
         ErrorMessage,
+    },
+    beforeCreate(){
+                axios
+                .get("/accounts/csrf_cookie")
+                .then(response => {
+                  const csrftoken =     VueCookies.get('csrf');
+                  console.log(csrftoken);
+                  axios.defaults.headers.common['X-CSRFToken'] = csrftoken // for all requests
+                })
+                .catch(error => {
+                    console.log(error)
+                })
+
     },
     data() {
     const schema = yup.object().shape({
@@ -93,11 +107,15 @@ export default {
         const formData = {
             username: user.username,
             password: user.password,
-            email: user.email
+            re_password: user.password
         }
 
+            const csrftoken =     VueCookies.get('csrf');
+            console.log(csrftoken);
+            axios.defaults.headers.common['X-CSRFToken'] = csrftoken
+
         axios
-            .post('/auth/users/', formData)
+            .post('/accounts/register', formData)
             .then(response => {
                 this.$router.push("/login")
                 this.message = data.message;
