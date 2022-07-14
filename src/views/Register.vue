@@ -63,11 +63,9 @@ export default {
     },
     beforeCreate(){
                 axios
-                .get("/accounts/csrf_cookie")
+                .get("/accounts/csrf_cookie", { withCredentials: true })
                 .then(response => {
-                  const csrftoken =     VueCookies.get('csrf');
-                  console.log(csrftoken);
-                  axios.defaults.headers.common['X-CSRFToken'] = csrftoken // for all requests
+                  console.log("I received a cookies!")   
                 })
                 .catch(error => {
                     console.log(error)
@@ -110,12 +108,17 @@ export default {
             re_password: user.password
         }
 
-            const csrftoken =     VueCookies.get('csrf');
-            console.log(csrftoken);
-            axios.defaults.headers.common['X-CSRFToken'] = csrftoken
+            const csrftoken =     VueCookies.get('csrftoken');
+            console.log(csrftoken)
+            let config = {
+                withCredentials: true ,
+                headers: {
+                  "X-CSRFToken": csrftoken,
+                }
+              }
 
         axios
-            .post('/accounts/register', formData)
+            .post('/accounts/register', formData, config)
             .then(response => {
                 this.$router.push("/login")
                 this.message = data.message;
