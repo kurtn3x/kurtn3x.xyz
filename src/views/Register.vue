@@ -63,9 +63,9 @@ export default {
     },
     beforeCreate(){
                 axios
-                .get("/accounts/csrf_cookie", { withCredentials: true })
+                .get("/auth/csrf_cookie", { withCredentials: true })
                 .then(response => {
-                  console.log("I received a cookies!")   
+                  console.log("I received a csrf cookie!")   
                 })
                 .catch(error => {
                     console.log(error)
@@ -105,10 +105,11 @@ export default {
         const formData = {
             username: user.username,
             password: user.password,
-            re_password: user.password
+            re_password: user.password,
+            email: user.email
         }
 
-            const csrftoken =     VueCookies.get('csrftoken');
+            const csrftoken = VueCookies.get('csrftoken');
             console.log(csrftoken)
             let config = {
                 withCredentials: true ,
@@ -118,7 +119,7 @@ export default {
               }
 
         axios
-            .post('/accounts/register', formData, config)
+            .post('/auth/register', formData, config)
             .then(response => {
                 this.$router.push("/login")
                 this.message = data.message;
