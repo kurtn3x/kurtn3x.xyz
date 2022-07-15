@@ -1,4 +1,5 @@
-# kurtn3x
+## Frontend für https://kurtn3x.xyz
+## developement unter https://test2.kurtn3x.xyz
 
 ## Project setup
 ```
@@ -20,5 +21,3 @@ npm run build
 npm run lint
 ```
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).

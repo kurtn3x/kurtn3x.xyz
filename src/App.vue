@@ -7,20 +7,6 @@
             <font-awesome-icon icon="home" /> Home
           </router-link>
         </li>
-        <div class="navbar-nav mr-auto">
-        <li class="nav-item">
-            <router-link to="/tutorials" class="nav-link">Tutorials</router-link>
-          </li>
-          <li class="nav-item">
-            <router-link to="/add" class="nav-link">Add</router-link>
-        </li>
-        </div>
-        <li v-if="showAdminBoard" class="nav-item">
-          <router-link to="/admin" class="nav-link">Admin Board</router-link>
-        </li>
-        <li v-if="showModeratorBoard" class="nav-item">
-          <router-link to="/mod" class="nav-link">Moderator Board</router-link>
-        </li>
       </div>
 
       <div v-if="!currentUser" class="navbar-nav ml-auto">
@@ -52,51 +38,63 @@
 </template>
 
 <script>
+import VueCookies from 'vue-cookies'
 import axios from 'axios'
 export default {
   name: 'App',
   computed: {
     currentUser() {
-      return this.$store.state.isLogged;
+      return this.$store.state.isAuthenticated;
     },
   },
+
   beforeCreate(){
     this.$store.commit('initializeStore')
-  },
-  // mounted(){
-  //   setInterval(()=> {
-  //     this.getAccess()
-  //   }, 50000)
-
-  // },
-  methods: {
-    // getAccess(e){
-    //   if (this.$store.state.isLogged){
-    //     const accessData = {
-    //       refresh: this.$store.state.refresh
-    //     }
-    //     axios
-    //       .post("/auth/jwt/refresh", accessData)
-    //       .then(response => {
-    //         const access = response.data.access
-    //         localStorage.setItem("access", access)
-    //         this.$store.commit("setAccess", access)
-    //         this.$store.commit("setIsLogged", true)
-
-    //       })
-    //       .catch(error =>{
-    //         console.log(error)
-    //       })
-    //   }
-    // },
-    logout(){
-            this.$store.commit('setAccess', '')
-            this.$store.commit('setRefresh', '')
-            this.$store.commit('setIsLogged', false)
-            localStorage.setItem("access", '')
-            localStorage.setItem("refresh", '')
-            localStorage.setItem("isLogged", false)
+    let config = {
+      withCredentials: true ,
+      headers: {
+        "X-CSRFToken": VueCookies.get('csrftoken'),
+      }
     }
+
+    axios
+    .get("/auth/authenticated", config)
+    .then(response => {
+      if (response.status == 200){
+        console.log("authenticated")
+        this.$store.commit("setAccess", true)
+      } else {
+        this.$store.commit("setAccess", false)
+      }
+    })
+    .catch(error => {
+      this.$store.commit("setAccess", false)
+    })
+  },
+
+  methods: {
+
+    logout(){
+      let config = {
+        withCredentials: true,
+        headers: {
+          "X-CSRFToken": VueCookies.get('csrftoken'),
+        }
+      }
+
+      axios
+      .post('/auth/logout', "", config)
+      .then(response => {
+        if (response.status == 200){
+          this.$store.commit("setAccess", false)
+        }
+      })
+      .catch(error => {
+        console.log(error)
+      })
+ 
+    },
+
   }
 }
 // }

@@ -54,13 +54,6 @@ export default {
   beforeCreate(){
     axios
     .get("/auth/csrf_cookie", { withCredentials: true })
-    .then(response => {
-      console.log("I received a csrf cookie!")   
-    })
-    .catch(error => {
-      console.log(error)
-    })
-
   },
     data(){
       const schema = yup.object().shape({
@@ -76,37 +69,47 @@ export default {
         }
     },
     methods: {
-        handleLogin(user){
-          localStorage.removeItem('access')
-          // this.loading = true;
+      handleLogin(user){
+        localStorage.removeItem('access')
+        // this.loading = true;
 
-            const formData = {
-                username: user.username,
-                password: user.password
-            }
-            let config = {
-                withCredentials: true,
-                headers: {
-                  "X-CSRFToken": VueCookies.get('csrftoken'),
-                }
-            }
+        const formData = {
+              username: user.username,
+              password: user.password
+          }
+          let config = {
+              withCredentials: true,
+              headers: {
+                "X-CSRFToken": VueCookies.get('csrftoken'),
+              }
+          }
 
-            axios
-                .post('/auth/login', formData, config)
-                .then( response => {
-                  VueCookies.set({sessionid: response.coo})
-                    this.$router.push("/home/")
-                })
-                .catch(error => {
-                this.loading = false;
+          axios
+              .post('/auth/login', formData, config)
+              .then( response => {
+              if (response.status != 200){
                 this.message =
-                  (error.response &&
-                    error.response.data &&
-                    error.response.data.message) ||
-                  error.message ||
-                  error.toString();
-                })
-          } 
+                ( response.data.message) 
+                  this.successful = false;
+                  this.loading = false;
+                } else {
+                  this.$router.push("/home")
+                  this.$store.commit("setAccess", true)
+                  this.successful = true;
+                  this.loading = false;
+                }
+         
+              })
+              .catch(error => {
+              this.loading = false;
+              this.message =
+                (error.response &&
+                  error.response.data &&
+                  error.response.data.message) ||
+                error.message ||
+                error.toString();
+              })
+        } 
     }
 }
 </script>

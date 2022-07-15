@@ -24,6 +24,11 @@
             <Field name="password" type="password" class="form-control" />
             <ErrorMessage name="password" class="error-feedback" />
           </div>
+          <div class="form-group">
+            <label for="password2">Confirm Password</label>
+            <Field name="password2" type="password" class="form-control" />
+            <ErrorMessage name="password2" class="error-feedback" />
+          </div>
 
           <div class="form-group">
             <button class="btn btn-primary btn-block" :disabled="loading">
@@ -64,70 +69,77 @@ export default {
     beforeCreate(){
                 axios
                 .get("/auth/csrf_cookie", { withCredentials: true })
-                .then(response => {
-                  console.log("I received a csrf cookie!")   
-                })
-                .catch(error => {
-                    console.log(error)
-                })
-
     },
     data() {
-    const schema = yup.object().shape({
-      username: yup
-        .string()
-        .required("Username is required!")
-        .min(3, "Must be at least 3 characters!")
-        .max(20, "Must be maximum 20 characters!"),
-      email: yup
-        .string()
-        .required("Email is required!")
-        .email("Email is invalid!")
-        .max(50, "Must be maximum 50 characters!"),
-      password: yup
-        .string()
-        .required("Password is required!")
-        .min(6, "Must be at least 6 characters!")
-        .max(40, "Must be maximum 40 characters!"),
-    });
-        return {
-            username: '',
-            password: '',
-            email: '',
-            successful: false,
-            loading: false,
-            message: "",
-            schema,
-        }
+      const schema = yup.object().shape({
+        username: yup
+          .string()
+          .required("Username is required!")
+          .min(3, "Must be at least 3 characters!")
+          .max(20, "Must be maximum 20 characters!"),
+        email: yup
+          .string()
+          .required("Email is required!")
+          .email("Email is invalid!")
+          .max(50, "Must be maximum 50 characters!"),
+        password: yup
+          .string()
+          .required("Password is required!")
+          .min(6, "Must be at least 6 characters!")
+          .max(40, "Must be maximum 40 characters!"),
+        password2:  yup
+          .string()    
+          .oneOf([yup.ref('password')], 'Your passwords do not match.')
+
+      });
+      
+      return {
+        username: '',
+        password: '',
+        password2:'',
+        email: '',
+        successful: false,
+        loading: false,
+        message: "",
+        schema,
+      }
     },
     methods:{
         handleRegister(user){
         const formData = {
             username: user.username,
             password: user.password,
-            re_password: user.password,
+            re_password: user.password2,
             email: user.email
         }
-
-            const csrftoken = VueCookies.get('csrftoken');
-            console.log(csrftoken)
-            let config = {
-                withCredentials: true ,
-                headers: {
-                  "X-CSRFToken": csrftoken,
-                }
-              }
+        let config = {
+            withCredentials: true,
+            headers: {
+              "X-CSRFToken": VueCookies.get('csrftoken'),
+            }
+        }
 
         axios
             .post('/auth/register', formData, config)
             .then(response => {
-                this.$router.push("/login")
-                this.message = data.message;
-                this.successful = true;
-                this.loading = false;
+                if (response.status != 200){
+                this.message =
+                ( response.data.message) 
+                  this.successful = false;
+                  this.loading = false;
+                } else {
+                  this.$router.push("/login")
+                  this.successful = true;
+                  this.loading = false;
+                }
             })
             .catch(error => {
               this.message =
+              (error.response &&
+              error.response.data &&
+              error.response.data.message) ||
+              error.message ||
+              error.toString();             this.message =
               (error.response &&
               error.response.data &&
               error.response.data.message) ||
