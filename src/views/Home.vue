@@ -1,7 +1,7 @@
 <template>
     <div class="login">
         <h1>HELLO</h1>
-      <div v-if="currentUser">  
+      <div>  
         <span :src="user_data">{{user_data}} </span>
       </div> 
     </div>
@@ -9,6 +9,7 @@
 
 
 <script>
+import VueCookies from 'vue-cookies'
 import axios from 'axios'
 export default {
     name: 'Home',
@@ -27,14 +28,20 @@ export default {
     },
     methods: {
         getMe(e){
+          let config = {
+            withCredentials: true ,
+            headers: {
+              "X-CSRFToken": VueCookies.get('csrftoken'),
+            }
+          }
             axios
-                .get("/auth/users/me/")
-                .then(response => {
-                    this.user_data = response.data.username
-                })
-                .catch(error => {
-                    console.log(error)
-                })
+            .get("/profile/user", config)
+            .then(response => {
+              console.log(response)
+            })
+            .catch(error => {
+                console.log(error)
+            })
         }
     }
 }

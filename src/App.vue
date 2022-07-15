@@ -63,37 +63,36 @@ export default {
   beforeCreate(){
     this.$store.commit('initializeStore')
   },
-  mounted(){
-    setInterval(()=> {
-      this.getAccess()
-    }, 50000)
+  // mounted(){
+  //   setInterval(()=> {
+  //     this.getAccess()
+  //   }, 50000)
 
-  },
+  // },
   methods: {
-    getAccess(e){
-      if (this.$store.state.isLogged){
-        const accessData = {
-          refresh: this.$store.state.refresh
-        }
-        axios
-          .post("/auth/jwt/refresh", accessData)
-          .then(response => {
-            const access = response.data.access
-            localStorage.setItem("access", access)
-            this.$store.commit("setAccess", access)
-            this.$store.commit("setIsLogged", true)
+    // getAccess(e){
+    //   if (this.$store.state.isLogged){
+    //     const accessData = {
+    //       refresh: this.$store.state.refresh
+    //     }
+    //     axios
+    //       .post("/auth/jwt/refresh", accessData)
+    //       .then(response => {
+    //         const access = response.data.access
+    //         localStorage.setItem("access", access)
+    //         this.$store.commit("setAccess", access)
+    //         this.$store.commit("setIsLogged", true)
 
-          })
-          .catch(error =>{
-            console.log(error)
-          })
-      }
-    },
+    //       })
+    //       .catch(error =>{
+    //         console.log(error)
+    //       })
+    //   }
+    // },
     logout(){
             this.$store.commit('setAccess', '')
             this.$store.commit('setRefresh', '')
             this.$store.commit('setIsLogged', false)
-            axios.defaults.headers.common['Authorization'] = ''
             localStorage.setItem("access", '')
             localStorage.setItem("refresh", '')
             localStorage.setItem("isLogged", false)

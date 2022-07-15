@@ -39,16 +39,28 @@
 </template>
 
 <script>
+import VueCookies from 'vue-cookies'
 import { Form, Field, ErrorMessage } from "vee-validate";
 import axios from 'axios'
 import * as yup from "yup";
 
 export default {
-    name: 'Login',
-      components: {
+  name: 'Login',
+  components: {
     Form,
     Field,
     ErrorMessage,
+  },
+  beforeCreate(){
+    axios
+    .get("/auth/csrf_cookie", { withCredentials: true })
+    .then(response => {
+      console.log("I received a csrf cookie!")   
+    })
+    .catch(error => {
+      console.log(error)
+    })
+
   },
     data(){
       const schema = yup.object().shape({
@@ -65,7 +77,6 @@ export default {
     },
     methods: {
         handleLogin(user){
-          axios.defaults.headers.common['Authorization'] = ''
           localStorage.removeItem('access')
           // this.loading = true;
 
@@ -73,23 +84,17 @@ export default {
                 username: user.username,
                 password: user.password
             }
+            let config = {
+                withCredentials: true,
+                headers: {
+                  "X-CSRFToken": VueCookies.get('csrftoken'),
+                }
+            }
 
             axios
-                .post('/auth/jwt/create/', formData)
+                .post('/auth/login', formData, config)
                 .then( response => {
-                    this.loading=false;
-                    const access = response.data.access
-                    const refresh = response.data.refresh
-
-                    this.$store.commit('setAccess', access)
-                    this.$store.commit('setRefresh', refresh)
-                    this.$store.commit('setIsLogged', true)
-
-                    axios.defaults.headers.common['Authorization'] = 'JWT ' + access
-                    localStorage.setItem("access", access)
-                    localStorage.setItem("refresh", refresh)
-                    localStorage.setItem("isLogged", true)
-
+                  VueCookies.set({sessionid: response.coo})
                     this.$router.push("/home/")
                 })
                 .catch(error => {
