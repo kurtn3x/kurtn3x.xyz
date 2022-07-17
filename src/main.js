@@ -3,12 +3,19 @@ import App from './App.vue'
 import router from './router'
 import store from './store'
 import axios from 'axios'
-import VueCookies from 'vue-cookies'
-import "bootstrap";
-import "bootstrap/dist/css/bootstrap.min.css";
-import { FontAwesomeIcon } from './plugins/font-awesome'
+import VueAxios from 'vue-axios'
+import {BootstrapVue3, NavbarPlugin } from 'bootstrap-vue-3'
+import 'bootstrap/dist/css/bootstrap.css'
+import 'bootstrap-vue-3/dist/bootstrap-vue-3.css'
 
 // CHANGE BASE URL DEPENDING ON PRODUCTION OR DEVELOPEMENT
 axios.defaults.baseURL = 'https://test.kurtn3x.xyz';
 // 
-createApp(App).use(store).use(router, axios).mount('#app')
+const Vue = createApp(App);
+Vue.use(router);
+Vue.use(VueAxios, axios);
+Vue.use(store);
+Vue.use(BootstrapVue3);
+Vue.use(NavbarPlugin);
+Vue.mount('#app');
+// createApp(App).use(router, axios, store, BootstrapVue3).mount('#app')

@@ -89,7 +89,7 @@ export default {
               .then( response => {
               if (response.status != 200){
                 this.message =
-                ( response.data.message) 
+                (response.data) 
                   this.successful = false;
                   this.loading = false;
                 } else {

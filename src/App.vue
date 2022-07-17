@@ -1,39 +1,50 @@
 <template>
   <div id="app">
-    <nav class="navbar navbar-expand navbar-dark bg-dark">
-      <div class="navbar-nav mr-auto">
-        <li class="nav-item">
-          <router-link to="/home" class="nav-link">
-            <font-awesome-icon icon="home" /> Home
-          </router-link>
-        </li>
-      </div>
+    <b-nav tabs align="center" class="navbar sticky-top navbar-expand navbar-dark bg-dark">
 
-      <div v-if="!currentUser" class="navbar-nav ml-auto">
-        <li class="nav-item">
-          <router-link to="/register" class="nav-link">
-            <font-awesome-icon icon="user-plus" /> Sign Up
-          </router-link>
-        </li>
-        <li class="nav-item">
-          <router-link to="/login" class="nav-link">
-            <font-awesome-icon icon="sign-in-alt" /> Login
-          </router-link>
-        </li>
-      </div>
+      <!-- Links on the left side -->
+        <div class="navbar-nav me-2">
+          <li class="nav-item">
+            <router-link to="/home" class="nav-link">
+              Home
+            </router-link>
+          </li>
+        </div>
+      
+      <!--  Links on the right side  -->
+        <!-- If user is NOT logged in  -->
+          <div v-if="!currentUser" class="navbar-nav ms-auto ">
+            <li class="nav-item">
+              <router-link to="/register" class="nav-link">
+                Sign Up
+              </router-link>
+            </li>
 
-      <div v-if="currentUser" class="navbar-nav ml-auto">
-        <li class="nav-item">
-          <button class="nav-link" @click="logout">
-            <font-awesome-icon icon="sign-out-alt" /> LogOut
-          </button>
-        </li>
-      </div>
-    </nav>
+            <li class="nav-item">
+              <router-link to="/login" class="nav-link">
+                Login
+              </router-link>
+            </li>
+          </div>
+          
+        <!--  If  user is logged in -->
+          <div v-if="currentUser" class="navbar-nav ms-auto">
+            <b-dropdown id="dropdown-1" text="My Profile" class="m-md-2">
+            <b-dropdown-item @click="logout">Logout</b-dropdown-item>
+            <b-dropdown-item>Second Action</b-dropdown-item>
+            <b-dropdown-item>Third Action</b-dropdown-item>
+            </b-dropdown>
+          </div>
 
+    </b-nav>
+
+
+    <!--  All other elements -->
     <div class="container">
       <router-view />
     </div>
+
+
   </div>
 </template>
 
@@ -90,14 +101,12 @@ export default {
         }
       })
       .catch(error => {
-        console.log(error)
       })
  
     },
 
   }
 }
-// }
 </script>
 
 
@@ -112,14 +121,14 @@ export default {
 }
 
 nav {
-  padding: 30px;
+  padding: 10px;
 
   a {
     font-weight: bold;
-    color: #2c3e50;
+    color: #1681ec;
 
     &.router-link-exact-active {
-      color: #42b983;
+      color: #11f0dd;
     }
   }
 }
