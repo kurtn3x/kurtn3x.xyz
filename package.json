@@ -25,6 +25,7 @@
     "vue-axios": "^3.4.1",
     "vue-cookies": "^1.8.1",
     "vue-router": "^4.0.3",
+    "vue3-recaptcha2": "^1.7.0",
     "vuex": "^4.0.0",
     "yup": "^0.32.11"
   },
