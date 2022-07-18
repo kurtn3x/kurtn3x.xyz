@@ -1,6 +1,6 @@
 
 <template>
-  <div class="col-md-12">
+  <div class="col-md-12" v-if="currentUser">
   
     <div class="card card-container">
       <img
@@ -30,14 +30,6 @@
             <Field name="password2" type="password" class="form-control" />
             <ErrorMessage name="password2" class="error-feedback" />
           </div>
-
-          <vue-recaptcha 
-          @verify="verifyMethod"
-          @expired="expiredMethod"
-          @error="errorMethod"
-          sitekey="6LcYAvwgAAAAAPQz8bHFLJDyN75EYRvjiLNw0GuN">
-          </vue-recaptcha>
-          
           <div class="form-group">
             <button class="btn btn-primary btn-block" :disabled="loading">
               <span
@@ -59,6 +51,11 @@
       </div>
     </div>
   </div>
+
+<div class="col-md-12" v-if="!currentUser">
+    <p> You are not logged in</p>
+</div>
+
 </template>
 
 
@@ -67,14 +64,12 @@ import VueCookies from 'vue-cookies'
 import axios from 'axios'
 import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
-import { VueRecaptcha } from 'vue-recaptcha';
 export default {
-    name: 'Signup',
+    name: 'Settings',
     components: {
         Form,
         Field,
         ErrorMessage,
-        VueRecaptcha,
     },
     beforeCreate(){
                 axios
@@ -112,67 +107,58 @@ export default {
         loading: false,
         message: "",
         schema,
-        captcha_solved: false
       }
     },
+    computed: {
+        currentUser() {
+        return this.$store.state.isAuthenticated;
+        },
+    },
     methods:{
-        verifyMethod(response){
-          this.captcha_solved = true;
-        },
-        expiredMethod(){
-          this.message = (" Captcha Expired ")
-        },
-        errorMethod(){
-          this.message = (" Captcha Error ")
-        },
 
         handleRegister(user){
-          const formData = {
-              username: user.username,
-              password: user.password,
-              re_password: user.password2,
-              email: user.email
-          }
-          let config = {
-              withCredentials: true,
-              headers: {
-                "X-CSRFToken": VueCookies.get('csrftoken'),
-              }
-          }
-          
-          if (this.captcha_solved == true ) {
-            axios
-                .post('/auth/register', formData, config)
-                .then(response => {
-                    if (response.status != 200){
-                    this.message =
-                    ( response.data.message) 
-                      this.successful = false;
-                      this.loading = false;
-                    } else {
-                      this.$router.push("/login")
-                      this.successful = true;
-                      this.loading = false;
-                    }
-                })
-                .catch(error => {
-                  this.message =
-                  (error.response &&
-                  error.response.data &&
-                  error.response.data.message) ||
-                  error.message ||
-                  error.toString();             this.message =
-                  (error.response &&
-                  error.response.data &&
-                  error.response.data.message) ||
-                  error.message ||
-                  error.toString();
+        const formData = {
+            username: user.username,
+            password: user.password,
+            re_password: user.password2,
+            email: user.email
+        }
+        let config = {
+            withCredentials: true,
+            headers: {
+              "X-CSRFToken": VueCookies.get('csrftoken'),
+            }
+        }
+
+        axios
+            .post('/auth/register', formData, config)
+            .then(response => {
+                if (response.status != 200){
+                this.message =
+                ( response.data.message) 
                   this.successful = false;
                   this.loading = false;
-                })
-            } else {
-              this.message = (" Captcha not solved. ")
-            }
+                } else {
+                  this.$router.push("/login")
+                  this.successful = true;
+                  this.loading = false;
+                }
+            })
+            .catch(error => {
+              this.message =
+              (error.response &&
+              error.response.data &&
+              error.response.data.message) ||
+              error.message ||
+              error.toString();             this.message =
+              (error.response &&
+              error.response.data &&
+              error.response.data.message) ||
+              error.message ||
+              error.toString();
+              this.successful = false;
+              this.loading = false;
+            })
 
         }
 

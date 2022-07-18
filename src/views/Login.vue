@@ -18,6 +18,12 @@
           <ErrorMessage name="password" class="error-feedback" />
         </div>
 
+      <div class="form-group">
+        <router-link id="signuptext" to="/register" class="nav-link">
+            New? Sign up.
+        </router-link>
+      </div>
+
         <div class="form-group">
           <button class="btn btn-primary btn-block" :disabled="loading">
             <span
@@ -69,6 +75,9 @@ export default {
         }
     },
     methods: {
+      startHacking() {
+      this.$notify("Hello user!");
+      },
       handleLogin(user){
         localStorage.removeItem('access')
         // this.loading = true;
@@ -93,10 +102,13 @@ export default {
                   this.successful = false;
                   this.loading = false;
                 } else {
+                  this.startHacking()
                   this.$router.push("/home")
                   this.$store.commit("setAccess", true)
                   this.successful = true;
                   this.loading = false;
+                  this.startHacking()
+
                 }
          
               })

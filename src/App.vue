@@ -4,9 +4,15 @@
 
       <!-- Links on the left side -->
         <div class="navbar-nav mx-5">
-            <router-link id="test123" to="/home" class="nav-link" >
+            <router-link id="home_button" to="/home" class="nav-link" >
               Home
             </router-link>
+            <div v-if="!currentUser">
+              <router-link id="add_button" to="/add" class="nav-link" >
+                
+              </router-link>
+            
+            </div>
         </div>
 
       
@@ -15,20 +21,20 @@
       <!--  Links on the right side  -->
         <!-- If user is NOT logged in  -->
           <div v-if="!currentUser" class="navbar-nav ms-auto  mx-5">
-              <router-link to="/register" class="nav-link">
+              <router-link id="register_button" to="/register" class="nav-link">
                 Sign Up
               </router-link>
 
-              <router-link to="/login" class="nav-link">
+              <router-link id="login_button" to="/login" class="nav-link">
                 Login
               </router-link>
           </div>
           
         <!--  If  user is logged in -->
           <div v-if="currentUser" class="navbar-nav ms-auto mx-5 ">
-            <b-dropdown id="profilebtn" text="My Profile" variant="secondary" >
-            <b-dropdown-item>My Profile</b-dropdown-item>
-            <b-dropdown-item>Settings</b-dropdown-item>
+            <b-dropdown id="profile_button" text="My Profile" variant="secondary" >
+            <b-dropdown-item to="/profile">My Profile</b-dropdown-item>
+            <b-dropdown-item to="/profile/settings">Settings</b-dropdown-item>
             <b-dropdown-item @click="logout">Logout</b-dropdown-item>
             </b-dropdown>
           </div>
@@ -97,6 +103,7 @@ export default {
       .then(response => {
         if (response.status == 200){
           this.$store.commit("setAccess", false)
+          this.$router.go()
         }
       })
       .catch(error => {
@@ -119,29 +126,65 @@ export default {
   color: #2c3e50;
 }
 
-#profilebtn {
+#profile_button {
 	background-color:transparent;
 	border:none;
 	display:block;
 	cursor:pointer;
 	color: rgba(255, 255, 255, 0.55);
-	text-decoration:none;
+	text-decoration:transparent;
   padding-right: 0.5rem;
   border-top-left-radius: 0.25rem;
   border-top-right-radius: 0.25rem;
   padding-left: 0.5rem;
-  border: 1px solid transparent;
+  border: none;
   border-color: transparent;
   font-size:20px;
 
 }
-#profilebtn:hover, #profilebtn:active {
-  background: none;
-  border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.75);
-  border-color: #e9ecef #e9ecef #dee2e6;
-  isolation: isolate;
+#home_button{
+  border:none;
 }
+#home_button:hover, #home_button:active, #home_button:focus {
+  text-decoration: underline rgba(255, 255, 255, 0.75);
+  background: none;
+  isolation: isolate;
+  box-shadow: none;
+  border: none;
+}
+
+#register_button{
+  border:none;
+}
+#register_button:hover, #register_button:active, #register_button:focus {
+  text-decoration: underline rgba(255, 255, 255, 0.75);
+  background: none;
+  isolation: isolate;
+  box-shadow: none;
+  border: none;
+}
+
+
+#login_button{
+  border:none;
+}
+#login_button:hover, #login_button:active, #login_button:focus {
+  text-decoration: underline rgba(255, 255, 255, 0.75);
+  background: none;
+  isolation: isolate;
+  box-shadow: none;
+  border: none;
+}
+
+#profile_button:hover, #profile_button:active, #profile_button:focus {
+  text-decoration: underline rgba(255, 255, 255, 0.75);
+  background: none;
+  isolation: isolate;
+  box-shadow: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+}
+
 
 #mynavbar{
   font-size:20px;
