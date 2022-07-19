@@ -17,6 +17,7 @@
       <div id="cssmenu">
         <ul>
             <li> <router-link id="home_button" to="/home" class="nav-link" > Home </router-link></li>
+            <li> <a href="/wasm_game.html"> Test </a></li>
 
             <!-- WEB-SPECIFIC  -->
                 <li id="rightregister" v-if="!this.mobileView && !this.currentUser">
