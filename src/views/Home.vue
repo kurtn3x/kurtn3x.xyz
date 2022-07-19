@@ -16,7 +16,7 @@ export default {
   
   computed: {
     currentUser() {
-      return this.$store.state.isLogged; 
+      return this.$store.state.isAuthenticated; 
     },
   },
 

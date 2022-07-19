@@ -7,47 +7,13 @@
         src="//ssl.gstatic.com/accounts/ui/avatar_2x.png"
         class="profile-img-card"
       />
-      <Form @submit="handleRegister" :validation-schema="schema">
-        <div v-if="!successful">
-          <div class="form-group">
-            <label for="username">Username</label>
-            <Field name="username" type="text" class="form-control" />
-            <ErrorMessage name="username" class="error-feedback" />
-          </div>
-          <div class="form-group">
-            <label for="email">Email</label>
-            <Field name="email" type="email" class="form-control" />
-            <ErrorMessage name="email" class="error-feedback" />
-          </div>
-          <div class="form-group">
-            <label for="password">Password</label>
-            <Field name="password" type="password" class="form-control" />
-            <ErrorMessage name="password" class="error-feedback" />
-          </div>
-          <div class="form-group">
-            <label for="password2">Confirm Password</label>
-            <Field name="password2" type="password" class="form-control" />
-            <ErrorMessage name="password2" class="error-feedback" />
-          </div>
-          <div class="form-group">
-            <button class="btn btn-primary btn-block" :disabled="loading">
-              <span
-                v-show="loading"
-                class="spinner-border spinner-border-sm"
-              ></span>
-              Sign Up
-            </button>
-          </div>
-        </div>
-      </Form>
-
-      <div
-        v-if="message"
-        class="alert"
-        :class="successful ? 'alert-success' : 'alert-danger'"
-      >
-        {{ message }}
-      </div>
+        <span :src="username"> Username: {{username}} </span>
+        <span :src="id"> User ID: {{id}} </span>
+        <span :src="first_name"> First Name: {{first_name}} </span>
+        <span :src="last_name"> Last Name: {{last_name}} </span>
+        <span :src="phone"> Phone: {{phone}} </span>
+        <span :src="user"> User: {{user}} </span>
+        <a href="#" class="myButton">Edit</a>
     </div>
   </div>
 
@@ -57,110 +23,70 @@
 </template>
 
 
-<script>
+<script> 
 import VueCookies from 'vue-cookies'
 import axios from 'axios'
-import { Form, Field, ErrorMessage } from "vee-validate";
-import * as yup from "yup";
 export default {
-    name: 'Profile',
-    components: {
-        Form,
-        Field,
-        ErrorMessage,
+  name: 'Profile',
+  
+  computed: {
+    currentUser() {
+      return this.$store.state.isAuthenticated; 
     },
-    beforeCreate(){
-                axios
-                .get("/auth/csrf_cookie", { withCredentials: true })
-    },
-    data() {
-      const schema = yup.object().shape({
-        username: yup
-          .string()
-          .required("Username is required!")
-          .min(3, "Must be at least 3 characters!")
-          .max(20, "Must be maximum 20 characters!"),
-        email: yup
-          .string()
-          .required("Email is required!")
-          .email("Email is invalid!")
-          .max(50, "Must be maximum 50 characters!"),
-        password: yup
-          .string()
-          .required("Password is required!")
-          .min(6, "Must be at least 6 characters!")
-          .max(40, "Must be maximum 40 characters!"),
-        password2:  yup
-          .string()    
-          .oneOf([yup.ref('password')], 'Your passwords do not match.')
+  },
 
-      });
-      
-      return {
+  data(){
+    return {
         username: '',
-        password: '',
-        password2:'',
-        email: '',
-        successful: false,
-        loading: false,
-        message: "",
-        schema,
-      }
-    },
-    computed: {
-      currentUser() {
-        return this.$store.state.isAuthenticated;
-      },
-    },
-    methods:{
-
-        handleRegister(user){
-        const formData = {
-            username: user.username,
-            password: user.password,
-            re_password: user.password2,
-            email: user.email
-        }
-        let config = {
-            withCredentials: true,
-            headers: {
-              "X-CSRFToken": VueCookies.get('csrftoken'),
-            }
-        }
-
-        axios
-            .post('/auth/register', formData, config)
-            .then(response => {
-                if (response.status != 200){
-                this.message =
-                ( response.data.message) 
-                  this.successful = false;
-                  this.loading = false;
-                } else {
-                  this.$router.push("/login")
-                  this.successful = true;
-                  this.loading = false;
-                }
-            })
-            .catch(error => {
-              this.message =
-              (error.response &&
-              error.response.data &&
-              error.response.data.message) ||
-              error.message ||
-              error.toString();             this.message =
-              (error.response &&
-              error.response.data &&
-              error.response.data.message) ||
-              error.message ||
-              error.toString();
-              this.successful = false;
-              this.loading = false;
-            })
-
-        }
-
+        id: '',
+        first_name: '',
+        last_name: '',
+        phone: '',
+        user: '',
     }
+  },
+
+  mounted(){
+    this.getMe()
+  },
+
+  methods: {
+    getMe(e){
+      let config = {
+        withCredentials: true ,
+        headers: {
+          "X-CSRFToken": VueCookies.get('csrftoken'),
+        }
+      }
+
+      axios
+      .get("/profile/user", config)
+      .then(response => {
+        if (response.status == 200){
+          this.username = response.data.username
+          this.id = response.data.profile.id
+          this.first_name = response.data.profile.first_name
+          this.last_name = response.data.profile.last_name
+          this.phone = response.data.profile.phone
+          this.user = response.data.profile.user
+        } else {
+          this.username = ""
+          this.id = ""
+          this.first_name = ""
+          this.last_name = ""
+          this.phone = ""
+          this.user = ""        }
+      })
+      .catch(error => {
+        this.username = ""
+        this.id = ""
+        this.first_name = ""
+        this.last_name = ""
+        this.phone = ""
+        this.user = ""
+  })
+    }
+  }
 }
 </script>
 
@@ -203,4 +129,28 @@ label {
 .error-feedback {
   color: red;
 }
+
+.myButton {
+	background:linear-gradient(to bottom, #44c767 5%, #5cbf2a 100%);
+	background-color:#44c767;
+	border-radius:28px;
+	border:1px solid #18ab29;
+	display:inline-block;
+	cursor:pointer;
+	color:#ffffff;
+	font-family:Arial;
+	font-size:17px;
+	padding:16px 31px;
+	text-decoration:none;
+	text-shadow:0px 1px 0px #2f6627;
+}
+.myButton:hover {
+	background:linear-gradient(to bottom, #5cbf2a 5%, #44c767 100%);
+	background-color:#5cbf2a;
+}
+.myButton:active {
+	position:relative;
+	top:1px;
+}
+
 </style>

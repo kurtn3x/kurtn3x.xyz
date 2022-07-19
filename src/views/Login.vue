@@ -75,8 +75,11 @@ export default {
         }
     },
     methods: {
-      startHacking() {
-      this.$notify("Hello user!");
+      loginNotify() {
+        this.$notify({
+        title: "Logged in.",
+        type: "success"
+        });
       },
       handleLogin(user){
         localStorage.removeItem('access')
@@ -102,7 +105,7 @@ export default {
                   this.successful = false;
                   this.loading = false;
                 } else {
-                  this.startHacking()
+                  this.loginNotify()
                   this.$router.push("/home")
                   this.$store.commit("setAccess", true)
                   this.successful = true;

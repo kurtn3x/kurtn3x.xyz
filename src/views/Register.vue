@@ -116,6 +116,12 @@ export default {
       }
     },
     methods:{
+        registerNotify() {
+          this.$notify({
+          title: "Registered.",
+          type: "success"
+          });
+        },
         verifyMethod(response){
           this.captcha_solved = true;
         },
@@ -150,6 +156,7 @@ export default {
                       this.successful = false;
                       this.loading = false;
                     } else {
+                      this.registerNotify()
                       this.$router.push("/login")
                       this.successful = true;
                       this.loading = false;
