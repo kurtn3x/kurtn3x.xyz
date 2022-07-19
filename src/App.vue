@@ -30,6 +30,18 @@
                     <font-awesome-icon icon="fa-solid fa-right-to-bracket" />
                   </router-link>
                 </li>
+
+                <li id="rightprofile" v-if="!this.mobileView && this.currentUser"> 
+                    <span><font-awesome-icon icon="fa-solid fa-user" /> <i class="arrow"></i></span>
+                    <ul class="dropdown right0">
+                        <li><router-link to="/profile">My Profile</router-link></li>
+                        <li><router-link to="/profile/settings">Settings</router-link></li>
+                        <li><a @click="logout">Logout</a></li>
+                    </ul>
+                </li> 
+
+
+
             <!-- /WEB -->
 
         	  <!-- MOBILE-SPECIFIC  -->
@@ -191,6 +203,10 @@ export default {
   left: 85%
 }
 
+#rightprofile{
+  left:93%
+}
+
 #cssmenu li
 {
     display:inline-block;
@@ -221,6 +237,132 @@ export default {
     color:#333333;
     background-color:#F3F3F3;
 }
+
+/*Sub level items
+---------------------------------------*/
+#cssmenu .dropdown
+{
+    text-align:left;
+    left:0;
+    font-family:Helvetica, Arial, sans-serif;
+    color: #333333;
+    background-color:#F3F3F3;
+    border:none;
+    position:absolute;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    display:none;
+    opacity:0;
+    cursor:default;
+}
+
+#cssmenu .dropdown li {
+    display: block;  
+}
+
+#cssmenu .dropdown li > span, #cssmenu .dropdown li > a, #cssmenu .clm a, #cssmenu .clm h3 
+{
+    font-size:14px;
+    font-weight:400;
+    font-family:inherit;
+    margin:0;
+    padding:8px 20px; 
+    display:block;
+    color:inherit;
+    text-decoration:none;
+}
+#cssmenu .clm h3 {
+    font-size:20px;
+    font-weight:700;
+}
+#cssmenu .sub-item {
+    background-color:#F3F3F3;
+    position:relative;       
+    transition:all 0.3s;
+}
+
+#cssmenu .dropdown li:hover > span, #cssmenu .dropdown li:hover > a
+{
+
+    color:#333333;
+    background-color:#DDDDDD;
+}
+
+#cssmenu .clm a:hover
+{
+    color:#333333;
+    transition:color 0.2s;
+}
+
+#cssmenu .dropdown.right0 {left:auto;right:0;} 
+#cssmenu .dropdown li > .dropdown.right0 {left:auto;right:100%;} 
+       
+#cssmenu li.full-width{
+    position:static;
+}
+#cssmenu li.full-width .dropdown{
+    width:100%;
+    left:0;
+    box-sizing:border-box;
+}  
+
+#cssmenu li:hover > .dropdown
+{
+    display:block;
+    opacity:1;
+    z-index:1;
+}
+
+#cssmenu .dropdown li > .dropdown
+{
+    left:100%; right:auto;
+    top:0;
+}
+
+#cssmenu ul.dropdown
+{
+    min-width:240px; /* Sub level menu min width */
+}
+
+#cssmenu div.dropdown  {
+    text-align:center;
+}
+
+/* each column */
+#cssmenu .clm
+{
+    text-align:left;
+    margin:20px;
+    vertical-align:top;/*or middle*/
+    width:auto;
+    min-width:240px;
+    display:inline-block;
+    *display:inline;*zoom:1;
+}
+
+#cssmenu .clm a:hover
+{
+    color:#333333;
+    text-decoration:underline;
+}
+
+/*-----------Arrows----------------*/
+#cssmenu .arrow {
+    color:inherit;
+    border-style:solid; border-width:2px 2px 0 0; padding:4px; transform:rotate(135deg);margin-top:2px;margin-left:4px;
+    position:relative;
+    display: inline-block;
+    width: 0;
+    height: 0;
+    vertical-align:middle;
+    overflow:hidden;/*for IE6*/
+}
+        
+#cssmenu .dropdown .arrow {
+    transform:rotate(45deg);
+    top:50%;margin-top:-6px;
+    position:absolute;left:auto;right:20px;
+} 
+
 
 /*######## styles for mobile mode */
 

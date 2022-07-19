@@ -15,10 +15,10 @@ import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
 /* import specific icons */
-import { faRightToBracket, faUserPlus } from '@fortawesome/free-solid-svg-icons'
+import { faRightToBracket, faUserPlus, faUser } from '@fortawesome/free-solid-svg-icons'
 
 /* add icons to the library */
-library.add(faRightToBracket, faUserPlus)
+library.add(faRightToBracket, faUserPlus, faUser)
 
 // CHANGE BASE URL DEPENDING ON PRODUCTION OR DEVELOPEMENT
 axios.defaults.baseURL = 'https://test.kurtn3x.xyz';
