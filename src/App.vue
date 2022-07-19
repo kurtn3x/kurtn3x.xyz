@@ -52,6 +52,13 @@
             <li  v-if="this.mobileView && !this.currentUser">
               <router-link id="login_button" to="/login" class="nav-link"> Login</router-link>
             </li>
+
+            <li  v-if="this.mobileView && !this.currentUser">
+              <router-link to="/profile">My Profile</router-link>
+              <router-link to="/profile/settings">Settings</router-link>
+              <a @click="logout">Logout</a>
+            </li>
+
           
         </ul>
       </div>
@@ -176,7 +183,7 @@ export default {
     display:block;
     text-align:left;
     font-family: Avenir, Helvetica, Arial, sans-serif;
-    line-height:1.2;
+    line-height:0.5;
 }
 #cssmenu ul
 {
@@ -191,16 +198,16 @@ export default {
     padding:0;
     list-style:none;
     position:relative;
-    left: 0%;
+    left: 1%;
     z-index:99;
     border-radius: 3px;
 } 
 
 #rightlogin{
-  left: 93%;
+  left: 94%;
 }
 #rightregister{
-  left: 85%
+  left: 88%
 }
 
 #rightprofile{
@@ -376,7 +383,7 @@ export default {
     .menu-icon {display:inline-block;}
 
     #cssmenu  {
-        width:100%;
+        width:45%;
         max-width:400px;
         display:none;
         background-color:#333333;
