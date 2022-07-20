@@ -54,13 +54,15 @@
               <router-link id="login_button" to="/login" class="nav-link"> Login</router-link>
             </li>
 
-            <li  v-if="this.mobileView && !this.currentUser">
-              <router-link to="/profile">My Profile</router-link>
-              <router-link to="/profile/settings">Settings</router-link>
-              <a @click="logout">Logout</a>
+            <li  v-if="this.mobileView && this.currentUser">
+              <router-link to="/profile"> My Profile </router-link>
             </li>
-
-          
+            <li  v-if="this.mobileView && this.currentUser">
+              <router-link to="/profile/settings"> Settings </router-link>
+            </li>
+            <li  v-if="this.mobileView && this.currentUser">
+              <a @click="logout">Logout</a>
+            </li>      
         </ul>
       </div>
     </b-nav>
