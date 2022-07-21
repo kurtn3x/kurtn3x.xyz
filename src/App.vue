@@ -16,18 +16,20 @@
       </div>
       <div id="cssmenu">
         <ul>
-            <li> <router-link id="home_button" to="/home" class="nav-link" > Home </router-link></li>
+            <li> <router-link to="/home" class="nav-link" > Home </router-link></li>
             <li> <a href="/wasm_game.html"> Test </a></li>
+            <!-- <li> <router-link to="/profile" class="nav-link" > Profile </router-link></li> -->
+
 
             <!-- WEB-SPECIFIC  -->
                 <li id="rightregister" v-if="!this.mobileView && !this.currentUser">
-                  <router-link to="/register" class="nav-link">
+                  <router-link to="/register" class="nav-link" title="Register">
                     <font-awesome-icon icon="fa-solid fa-user-plus" />
                   </router-link>
                 </li>
 
                 <li id="rightlogin" v-if="!this.mobileView && !this.currentUser">
-                  <router-link id="login_button" to="/login" class="nav-link">
+                  <router-link id="login_button" to="/login" class="nav-link" title="Login">
                     <font-awesome-icon icon="fa-solid fa-right-to-bracket" />
                   </router-link>
                 </li>
@@ -35,9 +37,9 @@
                 <li id="rightprofile" v-if="!this.mobileView && this.currentUser"> 
                     <span><font-awesome-icon icon="fa-solid fa-user" /> <i class="arrow"></i></span>
                     <ul class="dropdown right0">
-                        <li><router-link to="/profile">My Profile</router-link></li>
-                        <li><router-link to="/profile/settings">Settings</router-link></li>
-                        <li><a @click="logout">Logout</a></li>
+                        <li><router-link style="font-size: large;" to="/profile">My Profile</router-link></li>
+                        <li><router-link style="font-size: large;" to="/profile/settings">Settings</router-link></li>
+                        <li><a @click="logout" style="font-size: large;">Logout</a></li>
                     </ul>
                 </li> 
 

@@ -4,6 +4,7 @@ import Login from '../views/Login.vue'
 import Home from '../views/Home.vue'
 import Profile from '../views/Profile.vue'
 import Settings from '../views/Settings.vue'
+import TestGame from '../views/TestGame.vue'
 
 const routes = [
   {
@@ -34,6 +35,11 @@ const routes = [
     path: '/profile/settings',
     name: 'Settings',
     component: Settings
+  },
+  {
+    path: '/testgame',
+    name: 'TestGame',
+    component: TestGame
   },
 
   // {
