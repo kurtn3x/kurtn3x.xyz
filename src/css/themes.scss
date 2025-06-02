@@ -1,0 +1,175 @@
+@use 'sass:map';
+
+$themes: (
+  'theme-violet': (
+    // general primary color, has to be visible on both light and dark backgrounds
+    primary: #2063af,
+    // layout style, e.g. header, side drawerm dialog header...
+    layout-text: #f5f5f5,
+    layout-bg: #054690,
+  ),
+  'theme-orange': (
+    primary: #ee4d2e,
+    layout-text: #fff,
+    layout-bg: #ee4d2e,
+  ),
+  'theme-green': (
+    primary: #1db992,
+    layout-text: #fff,
+    layout-bg: #1db992,
+  ),
+  'theme-olive': (
+    primary: #bfbc06,
+    layout-text: #fff,
+    layout-bg: #bfbc06,
+  ),
+  'theme-blue': (
+    primary: #2ba3ff,
+    layout-text: #fff,
+    layout-bg: #2ba3ff,
+  ),
+  'theme-dark': (
+    primary: #7a97aa,
+    layout-text: #fff,
+    layout-bg: #1e2022,
+  ),
+  'theme-heaven': (
+    primary: #b7c8d4,
+    layout-text: #1d1d1d,
+    layout-bg: #f0f5f9,
+  ),
+  'theme-purple': (
+    primary: #7630bd,
+    layout-text: #fff,
+    layout-bg: #290861,
+  ),
+);
+
+@font-face {
+  font-family: 'Poppins';
+  src:
+    local('Poppins'),
+    url(Poppins.ttf) format('truetype');
+}
+
+.font {
+  font-family: 'Poppins', Helvetica, Arial;
+}
+
+$LIGHTING_FLOOR: 1;
+$LIGHTING_CEIL: 2;
+$LIGHTING_FLAT: 3;
+
+@mixin text3d(
+  $primary,
+  $depth: 5,
+  $shadowsteps: 5,
+  $shadowincrementer: 3px,
+  $shadowopacity: 0.5,
+  $primaryshadowcolour: #000,
+  $lighting: $LIGHTING_CEIL
+) {
+  $predefinedShadows: (
+    0 0 5px rgba($primaryshadowcolour, 0.05),
+    0 -1px 3px rgba($primaryshadowcolour, 0.2),
+    0 3px 5px rgba($primaryshadowcolour, 0.2)
+  );
+  $value: ();
+  @for $i from 1 through $depth {
+    $num: $i + px;
+    $hueadjust: $i;
+    @if ($lighting == $LIGHTING_FLOOR) {
+      $hueadjust: ($i * 2 - $depth - 5) * 1%;
+    } @else if ($lighting == $LIGHTING_CEIL) {
+      $hueadjust: -($i * 2 + $depth - 10) * 1%;
+    } @else if ($lighting == $LIGHTING_FLAT) {
+      $hueadjust: -$depth * 1%;
+    }
+    $colour: adjust-color($primary, $lightness: $hueadjust);
+    $theShadow: 0 $num 0 $colour;
+    $value: append($value, $theShadow, comma);
+  }
+
+  @for $i from 1 through $shadowsteps {
+    @if ($i >= length($predefinedShadows)) {
+      $dist: $i * $shadowincrementer;
+      $value: append($value, 0 $dist $dist rgba($primaryshadowcolour, $shadowopacity));
+    } @else {
+      $value: append($value, nth($predefinedShadows, $i));
+    }
+  }
+
+  text-shadow: $value;
+}
+
+@each $theme, $colors in $themes {
+  .preview-#{$theme} {
+    background: map-get($map: $colors, $key: 'primary') !important;
+  }
+  [data-theme='#{$theme}'] {
+    @each $name, $color in $colors {
+      .bg-#{$name} {
+        background: $color !important;
+      }
+      .text-#{$name} {
+        color: $color !important;
+      }
+    }
+
+    $primary: map.get($colors, primary);
+
+    .text3d-primary {
+      font-family: 'Poppins', Helvetica, Arial;
+      color: #fff;
+
+      @include text3d(
+        adjust-color($primary, $lightness: -8%),
+        $depth: 8,
+        $primaryshadowcolour: adjust-color($primary, $lightness: -10%, $saturation: +20%),
+        $shadowopacity: 0.3
+      );
+    }
+  }
+}
+
+.bg-start-violet {
+  background: linear-gradient(145deg, #054690 1%, rgb(255, 0, 0) 250%);
+}
+
+.bg-start-orange {
+  background: radial-gradient(
+    circle,
+    rgb(125, 16, 80) 15%,
+    rgb(135, 7, 24) 54%,
+    rgb(238, 78, 46) 100%
+  );
+}
+
+.bg-start-green {
+  background: linear-gradient(
+    90deg,
+    rgba(10, 172, 71, 1) 0%,
+    rgba(29, 185, 146, 1) 35%,
+    rgba(21, 87, 150, 1) 100%
+  );
+}
+
+.bg-start-olive {
+  background: radial-gradient(circle, rgba(191, 188, 6, 1) 5%, rgba(29, 89, 2, 1) 100%);
+}
+
+.bg-start-blue {
+  background: linear-gradient(0deg, rgba(5, 9, 100, 1) 15%, #2ba3ff 100%);
+}
+
+.bg-start-dark {
+  background: linear-gradient(45deg, #1e2022 2%, #b7c8d4 250%);
+}
+
+.bg-start-heaven {
+  background: linear-gradient(45deg, #7cacd5 10%, #a0bdd0 52%, #f0f5f9 100%);
+}
+
+.bg-start-purple {
+  background: radial-gradient(circle, #5a189a 5%, #240046 100%, #10002b 5000%);
+}

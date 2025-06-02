@@ -1,0 +1,33 @@
+// app global css in SCSS form
+
+@import './themes.scss';
+.bg {
+  position: relative;
+  overflow: hidden;
+  width: inherit;
+  height: 1000%;
+}
+
+.bg-dark-page {
+  background: #121212;
+}
+
+.mono {
+  font-family: 'Lucida Console', Courier, monospace;
+}
+
+.drop-target {
+  border: 2px dashed lightblue !important;
+}
+
+.pointer-events {
+  pointer-events: auto;
+}
+
+.selected {
+  background-color: rgba(0, 191, 255, 0.2);
+}
+
+.highlight {
+  background-color: rgba(130, 247, 255, 0.486);
+}

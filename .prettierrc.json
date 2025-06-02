@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json.schemastore.org/prettierrc",
+  "printWidth": 100,
+  "plugins": ["@trivago/prettier-plugin-sort-imports"],
+  "importOrder": [
+    "^vue$",
+    "^vue-router",
+    "^vue/",
+    "^quasar",
+    "^pinia",
+    "^axios",
+    "^router",
+    "^src/router",
+    "^@/",
+    "^boot",
+    "^src/boot",
+    "^src/api",
+    "^stores",
+    "^src/stores",
+    "^components",
+    "^src/components",
+    "^[./]",
+    "^src/types",
+    "^.*\\u0000$"
+  ],
+  "importOrderSeparation": false,
+  "importOrderGroupNamespaceSpecifiers": true,
+  "importOrderCombineTypeAndValueImports": false,
+  "importOrderTypeScriptVersion": "5.0.0",
+  "importOrderParserPlugins": ["typescript", "decorators-legacy"],
+
+  "singleQuote": true,
+  "semi": true,
+  "htmlWhitespaceSensitivity": "ignore",
+  "useTabs": false,
+  "bracketSameLine": false,
+  "singleAttributePerLine": true,
+  "arrowParens": "always",
+  "overrides": [
+    {
+      "files": "*.vue",
+      "options": {
+        "tabWidth": 2
+      }
+    }
+  ]
+}

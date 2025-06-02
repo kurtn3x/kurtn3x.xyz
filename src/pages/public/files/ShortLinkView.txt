@@ -1,0 +1,72 @@
+<template>
+  <div
+    v-if="loading"
+    class="absolute-center"
+  >
+    <q-spinner
+      color="primary"
+      size="10em"
+    />
+  </div>
+  <div v-if="!loading">
+    <ErrorPage error-message="Something went wrong" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useQuasar } from 'quasar';
+import { api } from 'boot/axios';
+import ErrorPage from 'src/components/ErrorPage.vue';
+
+const q = useQuasar();
+const route = useRoute();
+const router = useRouter();
+
+const loading = ref(true);
+
+onMounted(async () => {
+  const id = route.params.id;
+
+  const axiosConfig = {
+    withCredentials: true,
+    headers: {
+      'X-CSRFToken': q.cookies.get('csrftoken'),
+    },
+  };
+
+  api
+    .get('/files/sl/' + id, axiosConfig)
+    .then(async (response) => {
+      if (response.status == 200) {
+        await router.push('/files/' + response.data.objectType + '/' + response.data.objectId);
+      } else {
+        loading.value = false;
+      }
+    })
+    .catch((error) => {
+      if (error.response) {
+        q.notify({
+          type: 'negative',
+          message: error.response.data?.errorMessage || 'An error occurred',
+        });
+      }
+      loading.value = false;
+    });
+});
+</script>
+
+<style scoped>
+.disable-select {
+  user-select: none; /* supported by Chrome and Opera */
+  -webkit-user-select: none; /* Safari */
+  -khtml-user-select: none; /* Konqueror HTML */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* Internet Explorer/Edge */
+}
+
+.my-custom-class {
+  outline: 5px dotted green;
+}
+</style>
