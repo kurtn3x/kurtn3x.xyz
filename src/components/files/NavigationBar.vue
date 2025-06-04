@@ -121,7 +121,7 @@ interface DragState {
   activeDropTargets: Set<string>;
 }
 
-const $q = useQuasar();
+const q = useQuasar();
 const fileStore = useFileStore();
 const navigation = fileStore.navigation;
 
@@ -272,6 +272,13 @@ async function navigateToItem(item: NavItem, index: number, isFromHidden: boolea
  */
 async function handleDrop(event: DragEvent, folderId: string) {
   if (!event.dataTransfer) return;
+  if (folderId === fileStore.fileOps.rawFolderContent.id) {
+    q.notify({
+      type: 'positive',
+      message: 'Files are already in this folder',
+    });
+    return;
+  }
 
   // Get the dragged data
   const plainData = event.dataTransfer.getData('text/plain');
@@ -329,7 +336,7 @@ watch(
 
 // Watch for window resize to recalculate visibility
 watch(
-  () => $q.screen.width,
+  () => q.screen.width,
   async () => {
     await recalculateVisibleItems();
   },

@@ -35,7 +35,7 @@
 
           <q-list class="q-ma-xs">
             <template
-              v-for="file in uploadStore.uploadList"
+              v-for="file in uploadStore.uploadPreviewList"
               :key="file.name"
             >
               <q-card
@@ -47,7 +47,7 @@
                   clickable
                   @click="
                     file.edit = true;
-                    file.temp = file.name;
+                    file.edit_name = file.name;
                   "
                   class="bg-primary text-layout-text"
                 >
@@ -74,13 +74,13 @@
                       unelevated
                       outline
                       class="bg-red text-white q-ml-sm"
-                      @click.stop="uploadStore.removeUploadEntry(file)"
+                      @click.stop="uploadStore.removeUploadEntry(file.name)"
                     />
                   </q-item-section>
                 </q-item>
                 <div v-if="file.edit">
                   <q-input
-                    v-model="file.temp"
+                    v-model="file.edit_name"
                     :rules="[(val) => !/\/|\x00/.test(val) || 'No slash or null char']"
                     dense
                     color="layout-text"
@@ -88,7 +88,6 @@
                     autofocus
                     input-class="text-layout-text"
                     hide-bottom-space
-                    :error="file.error"
                     @keyup.enter="uploadStore.changeFileName(file)"
                   >
                     <template v-slot:append>
@@ -108,10 +107,7 @@
                         outline
                         size="xs"
                         round
-                        @click="
-                          file.edit = false;
-                          file.error = false;
-                        "
+                        @click="file.edit = false"
                       />
                     </template>
                   </q-input>
@@ -190,6 +186,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useFileOperationsStore } from 'src/stores/fileStores/fileOperationsStore';
 import { useUploadStore } from 'src/stores/fileStores/uploadStore';
 
 // Props definition
@@ -201,13 +198,14 @@ console.log(props);
 
 // Store access
 const uploadStore = useUploadStore();
+const fileOps = useFileOperationsStore();
 
 const dragover = ref(false);
 const fileButtonFiles = ref<File[] | null>(null);
 
 // Method to start the upload process
-async function uploadFiles() {
-  await uploadStore.startUploadFromDialog();
+function uploadFiles() {
+  uploadStore.uploadFromPreviewList();
 }
 
 /**
@@ -247,7 +245,7 @@ function fileButtonChanged() {
   if (fileButtonFiles.value == null || fileButtonFiles.value.length === 0) return;
 
   for (const file of fileButtonFiles.value) {
-    uploadStore.addUploadEntry(file, 'file');
+    uploadStore.addUploadEntry(file, 'file', fileOps.rawFolderContent.id);
   }
   fileButtonFiles.value = null;
 }
@@ -269,10 +267,10 @@ function handleDrop(ev: DragEvent) {
 
         if (!validFile) continue;
 
-        uploadStore.addUploadEntry(validFile, 'file');
+        uploadStore.addUploadEntry(validFile, 'file', fileOps.rawFolderContent.id);
       } else if (entry.isDirectory) {
         const folder = entry;
-        uploadStore.addUploadEntry(folder, 'folder');
+        uploadStore.addUploadEntry(folder, 'folder', fileOps.rawFolderContent.id);
       }
     }
   }

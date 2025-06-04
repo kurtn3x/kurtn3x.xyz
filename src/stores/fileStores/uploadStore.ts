@@ -1,118 +1,242 @@
-import { computed, reactive, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { defineStore } from 'pinia';
 import axios from 'axios';
-import { ChunkedUploadManager } from 'src/api/ChunkedUploadManager';
 import { apiPost } from 'src/api/apiWrapper';
-import { fileSizeDecimal } from 'src/components/lib/functions';
+import { useChunkedUpload } from 'src/api/chunkedUpload';
+import { useFolderUpload } from 'src/api/folderUpload';
+import { fileSizeDecimal, generateUniqueUploadId } from 'src/components/lib/functions';
 import { useFileOperationsStore } from './fileOperationsStore';
 import type {
+  AnyTrackerNode,
+  AnyUploadProgressEntry,
+  ChunkedUploadProgressEntry,
+  FolderUploadProgressEntry,
+  RegularUploadProgressEntry,
   UploadPreviewEntry,
-  UploadProgressEntry,
-  UploadTrackingInfo,
 } from 'src/types/localTypes';
-import { UploadStatus } from 'src/types/localTypes';
+import {
+  isChunkedUpload,
+  isFolderUpload,
+  isRegularUpload,
+  UploadStatus,
+} from 'src/types/localTypes';
 
 /**
  * Upload Store - Handles file uploads including chunked uploads for large files
  *
- * Features:
+ * ## Features
  * - Regular uploads for files < 50MB
- * - Chunked uploads for files >= 50MB with pause/resume
+ * - Chunked uploads for files >= 50MB
  * - Progress tracking and error handling
- * - Persistent upload state across browser sessions
+ * - Unified upload list for both types
+ * - Sequential file uploads (but parallel chunk uploads)
+ *
+ * ## File Size Limits
+ * - **Regular uploads**: Files under 50MB
+ * - **Chunked uploads**: Files 50MB and larger
+ * - **Maximum size**: 50GB per file
  */
 export const useUploadStore = defineStore('upload', () => {
   const q = useQuasar();
   const fileOps = useFileOperationsStore();
+  const chunkedUpload = useChunkedUpload();
+  const folderUpload = useFolderUpload();
 
   // Constants
-  const MAX_FILE_SIZE = 500 * 1024 * 1024 * 1024 * 1024; // 50GB
+  const MAX_FILE_SIZE = 50 * 1024 * 1024 * 1024; // 50GB
   const CHUNKED_UPLOAD_THRESHOLD = 50 * 1024 * 1024; // 50MB
 
   // ========================================
   // STATE
   // ========================================
 
-  // Regular upload state
   const uploadPreviewList = ref<UploadPreviewEntry[]>([]);
-  const uploadProgessList = ref<UploadProgressEntry[]>([]);
-  const uploadInProgress = ref(false);
-  const uploadDialogOpen = ref(false);
+  const uploadProgressList = ref<AnyUploadProgressEntry[]>([]);
 
-  // Chunked upload state
-  const chunkedUploads = ref<UploadTrackingInfo[]>([]);
-  const showChunkedProgress = ref(false);
+  // Queue management - improved
+  const uploadQueue = ref<AnyUploadProgressEntry[]>([]);
+  const isProcessorActive = ref(false);
+  const maxConcurrentUploads = ref(3);
+
+  // Add this new state for better control
+  const processingScheduled = ref(false);
+
+  // UI state
+  const uploadDialogOpen = ref(false);
+  const showProgressDialog = ref(false);
 
   // ========================================
   // COMPUTED PROPERTIES
   // ========================================
 
   const hasUploads = computed(() => uploadPreviewList.value.length > 0);
-
-  const hasActiveRegularUploads = computed(() =>
-    uploadProgessList.value.some((upload) => upload.status === 'loading'),
-  );
-
-  const hasActiveChunkedUploads = computed(() =>
-    chunkedUploads.value.some(
-      (upload) =>
-        upload.status === UploadStatus.UPLOADING ||
-        upload.status === UploadStatus.QUEUED ||
-        upload.status === UploadStatus.PREPARING,
+  const uploadInProgress = computed(() => hasActiveUploads.value);
+  const hasActiveUploads = computed(() =>
+    uploadProgressList.value.some((upload) =>
+      [UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(upload.status),
     ),
   );
 
-  const hasAnyActiveUploads = computed(
-    () => hasActiveRegularUploads.value || hasActiveChunkedUploads.value,
+  const queuedUploads = computed(() =>
+    uploadQueue.value.filter((upload) => upload.status === UploadStatus.QUEUED),
   );
 
-  const completedChunkedUploads = computed(() =>
-    chunkedUploads.value.filter((upload) => upload.status === UploadStatus.COMPLETED),
+  const activeUploads = computed(() =>
+    uploadProgressList.value.filter((upload) =>
+      [UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(upload.status),
+    ),
   );
 
-  const failedChunkedUploads = computed(() =>
-    chunkedUploads.value.filter((upload) => upload.status === UploadStatus.FAILED),
+  const hasActiveRegularUploads = computed(() =>
+    uploadProgressList.value.some(
+      (upload) => isRegularUpload(upload) && upload.status === UploadStatus.UPLOADING,
+    ),
+  );
+
+  const hasActiveChunkedUploads = computed(() =>
+    uploadProgressList.value.some(
+      (upload) =>
+        isChunkedUpload(upload) &&
+        [UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(upload.status),
+    ),
+  );
+
+  const completedUploads = computed(() =>
+    uploadProgressList.value.filter((upload) => upload.status === UploadStatus.COMPLETED),
+  );
+
+  const failedUploads = computed(() =>
+    uploadProgressList.value.filter((upload) => upload.status === UploadStatus.FAILED),
   );
 
   const totalUploadProgress = computed(() => {
-    const regularProgress = uploadProgessList.value.reduce(
-      (sum, upload) => sum + upload.transferredPercent,
-      0,
-    );
-    const chunkedProgress = chunkedUploads.value.reduce(
-      (sum, upload) => sum + upload.uploadedBytes / upload.size,
+    if (uploadProgressList.value.length === 0) return 0;
+
+    const totalBytes = uploadProgressList.value.reduce((sum, upload) => sum + upload.sizeBytes, 0);
+    const uploadedBytes = uploadProgressList.value.reduce(
+      (sum, upload) => sum + upload.uploadedBytes,
       0,
     );
 
-    const totalItems = uploadProgessList.value.length + chunkedUploads.value.length;
-    return totalItems > 0 ? (regularProgress + chunkedProgress) / totalItems : 0;
+    return totalBytes > 0 ? uploadedBytes / totalBytes : 0;
   });
 
   // ========================================
-  // REGULAR UPLOAD METHODS
+  // IMPROVED QUEUE PROCESSOR
   // ========================================
 
   /**
-   * Add files to the upload queue
+   * Process uploads when needed (event-driven with smart polling)
    */
-  // function addToUploadList(files: UploadPreviewEntry[]) {
-  //   uploadPreviewList.value.push(...files);
+  function processUploads(): void {
+    // Avoid recursive processing
+    if (isProcessorActive.value) return;
 
-  //   // Automatically show chunked progress if any large files
-  //   const hasLargeFiles = files.some((file) => {
-  //     if (file.type === 'file' && file.content instanceof File) {
-  //       return file.content.size >= CHUNKED_UPLOAD_THRESHOLD;
-  //     }
-  //     return false;
-  //   });
+    isProcessorActive.value = true;
+    processingScheduled.value = false;
 
-  //   if (hasLargeFiles) {
-  //     showChunkedProgress.value = true;
-  //   }
-  // }
+    try {
+      const activeCount = activeUploads.value.length;
+      const availableSlots = maxConcurrentUploads.value - activeCount;
 
-  function validName(name: string) {
+      if (availableSlots > 0 && queuedUploads.value.length > 0) {
+        const uploadsToStart = queuedUploads.value.slice(0, availableSlots);
+
+        for (const upload of uploadsToStart) {
+          // Use ID for unique identification, not name
+          const queueIndex = uploadQueue.value.findIndex((u) => u.id === upload.id);
+          if (queueIndex !== -1 && upload.status === UploadStatus.QUEUED) {
+            uploadQueue.value.splice(queueIndex, 1);
+            uploadProgressList.value.push(upload);
+            executeUpload(upload).catch((error) => {
+              console.error(`Upload failed for ${upload.name} (ID: ${upload.id}):`, error);
+            });
+          }
+        }
+      }
+    } finally {
+      isProcessorActive.value = false;
+    }
+  }
+
+  /**
+   * Trigger upload processing with smart scheduling
+   */
+  function triggerUploadProcessing(): void {
+    // If processing is already scheduled, don't schedule again
+    if (processingScheduled.value) return;
+
+    // Use nextTick to avoid immediate recursive calls
+    processingScheduled.value = true;
+    nextTick(() => {
+      try {
+        processUploads();
+
+        // Only schedule next processing if:
+        // 1. There are still queued items
+        // 2. There are available slots
+        // 3. No processing is already scheduled
+        // 4. Add a reasonable limit to prevent infinite scheduling
+        const shouldContinue =
+          queuedUploads.value.length > 0 &&
+          activeUploads.value.length < maxConcurrentUploads.value &&
+          !isProcessorActive.value;
+
+        if (shouldContinue) {
+          // Schedule next check after a reasonable delay
+          setTimeout(() => {
+            if (queuedUploads.value.length > 0) {
+              // Double-check before scheduling
+              triggerUploadProcessing();
+            }
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Error in triggerUploadProcessing:', error);
+        processingScheduled.value = false;
+      }
+    }).catch((error) => {
+      console.error('Error in nextTick:', error);
+      processingScheduled.value = false;
+    });
+  }
+
+  /**
+   * Execute a single upload (regular or chunked) - IMPROVED
+   */
+  async function executeUpload(upload: AnyUploadProgressEntry): Promise<void> {
+    try {
+      let success = false;
+
+      if (isRegularUpload(upload)) {
+        success = await executeRegularUpload(upload);
+      } else if (isChunkedUpload(upload)) {
+        success = await executeChunkedUpload(upload);
+      } else if (isFolderUpload(upload)) {
+        success = await executeFolderUpload(upload);
+      }
+      if (success) {
+        q.notify({ type: 'positive', message: `Upload completed` });
+      }
+    } catch (error: any) {
+      console.error(`Upload execution failed for ${upload.name}:`, error);
+      upload.status = UploadStatus.FAILED;
+      upload.message = error.message || 'Upload failed';
+    } finally {
+      // Always trigger processing when an upload slot becomes available
+      // Use a small delay to ensure state updates are complete
+      setTimeout(() => {
+        triggerUploadProcessing();
+      }, 250);
+    }
+  }
+
+  // ========================================
+  // HELPER FUNCTIONS
+  // ========================================
+
+  function validName(name: string): boolean {
     if (name.length < 1) {
       q.notify({
         type: 'negative',
@@ -121,7 +245,6 @@ export const useUploadStore = defineStore('upload', () => {
       return false;
     }
 
-    // FIXME:
     if (name.includes('/') || name.includes('\x00')) {
       q.notify({
         type: 'negative',
@@ -130,7 +253,7 @@ export const useUploadStore = defineStore('upload', () => {
       return false;
     }
 
-    if (nameAvailable(name) === false) {
+    if (!nameAvailable(name)) {
       q.notify({
         type: 'negative',
         message: 'Item with same name already exists in upload list',
@@ -141,44 +264,54 @@ export const useUploadStore = defineStore('upload', () => {
     return true;
   }
 
-  function nameAvailable(name: string) {
-    if (uploadPreviewList.value.some((el: UploadPreviewEntry) => el.name === name)) {
+  // Fix nameAvailable to check ALL upload states
+  function nameAvailable(name: string): boolean {
+    // Check preview list
+    if (uploadPreviewList.value.some((el) => el.name === name)) {
       return false;
     }
 
+    // Check active progress list
+    if (uploadProgressList.value.some((el) => el.name === name)) {
+      return false;
+    }
+
+    // Check queue
+    if (uploadQueue.value.some((el) => el.name === name)) {
+      return false;
+    }
+
+    // Check existing files in current folder
     if (fileOps.rawFolderContent.children.some((el) => el.name === name)) {
       return false;
     }
+
     return true;
   }
 
   /**
    * Find a valid name for a file or folder
+   *
    * If the name already exists, add (1), (2), etc. until a unique name is found
    *
-   * @param name The original name to check and potentially modify
+   * @param originalName The original name to check and potentially modify
    * @param type 'file' or 'folder' - affects how extensions are handled
    * @returns A valid, unique name
    */
   function findAvailableName(originalName: string, type: 'file' | 'folder'): string {
-    // Check if the original name is valid as-is
     if (nameAvailable(originalName)) {
       return originalName;
     }
 
-    // For files, we need to handle extensions properly
     if (type === 'file') {
-      // Get the file name without the extension
       let nameWithoutExtension = originalName;
       let extension = '';
 
-      // Check if this file has an extension (it has a dot that isn't the first character)
       if (originalName.indexOf('.') > 0) {
         extension = originalName.substring(originalName.lastIndexOf('.'));
         nameWithoutExtension = originalName.substring(0, originalName.lastIndexOf('.'));
       }
 
-      // Check if the name already has a number in parentheses
       const parenthesisRegex = /\((\d+)\)$/;
       const match = nameWithoutExtension.match(parenthesisRegex);
 
@@ -186,21 +319,17 @@ export const useUploadStore = defineStore('upload', () => {
       let newName = '';
 
       if (match) {
-        // If it already has a number, start counting from that number + 1
         counter = parseInt(match[1]!, 10) + 1;
         nameWithoutExtension = nameWithoutExtension.replace(parenthesisRegex, '');
       }
 
-      // Keep incrementing the counter until we find a unique name
       do {
         newName = `${nameWithoutExtension}(${counter})${extension}`;
         counter++;
       } while (!nameAvailable(newName));
 
       return newName;
-    }
-    // For folders (simpler, no extension handling)
-    else {
+    } else {
       const parenthesisRegex = /\((\d+)\)$/;
       const match = originalName.match(parenthesisRegex);
 
@@ -209,12 +338,10 @@ export const useUploadStore = defineStore('upload', () => {
       let newName = '';
 
       if (match) {
-        // If it already has a number, start counting from that number + 1
         counter = parseInt(match[1]!, 10) + 1;
         nameBase = originalName.replace(parenthesisRegex, '');
       }
 
-      // Keep incrementing the counter until we find a unique name
       do {
         newName = `${nameBase}(${counter})`;
         counter++;
@@ -224,19 +351,23 @@ export const useUploadStore = defineStore('upload', () => {
     }
   }
 
-  // ///////////////////////////////////////////////////////////////////////////////////////////////////////
+  // ========================================
+  // UPLOAD PREVIEW METHODS
+  // ========================================
 
   /**
-   * Add a file or folder to the upload list as a previewable entry
+   * Add a file or folder to the upload preview list
    *
-   * -> entry should be FileSystemEntry if type is 'folder'
-   *
-   * -> entry should be File if type is 'file'
+   * @param entry - File or FileSystemEntry to add
+   * @param type - 'file' or 'folder'
    */
-  function addUploadEntry(entry: File | FileSystemEntry, type: 'file' | 'folder') {
+  function addUploadEntry(
+    entry: File | FileSystemEntry,
+    type: 'file' | 'folder',
+    parentId: string,
+  ): void {
     const name = entry.name;
 
-    // dont bother finding names for files/folders with invalid names
     if (name.includes('/') || name.includes('\x00') || name.length < 1) {
       q.notify({
         type: 'negative',
@@ -247,47 +378,61 @@ export const useUploadStore = defineStore('upload', () => {
 
     if (type === 'file' && entry instanceof File) {
       const validName = findAvailableName(name, type);
-      if (validName) {
-        uploadPreviewList.value.push({
-          name: validName,
-          type: 'file',
-          content: entry,
-          edit: false,
-          edit_name: '',
-        });
-      }
+      uploadPreviewList.value.push({
+        name: validName,
+        type: 'file',
+        parentId: parentId,
+        content: entry,
+        edit: false,
+        edit_name: '',
+      });
     } else if (type === 'folder' && entry instanceof FileSystemDirectoryEntry) {
       const validName = findAvailableName(name, type);
-      if (validName) {
-        uploadPreviewList.value.push({
-          name: validName,
-          type: 'folder',
-          content: entry,
-          edit: false,
-          edit_name: '',
-        });
-      }
+      uploadPreviewList.value.push({
+        name: validName,
+        type: 'folder',
+        parentId: parentId,
+        content: entry,
+        edit: false,
+        edit_name: '',
+      });
     }
   }
 
-  /**
-   * Remove a file from the upload preview list by name
-   */
-  function removeUploadEntry(name: string) {
+  // Fix removeUploadEntry to also check queue and progress (if needed)
+  function removeUploadEntry(name: string): void {
+    // Remove from preview list
     uploadPreviewList.value = uploadPreviewList.value.filter((item) => item.name !== name);
+
+    // Also remove from queue if it exists there (edge case)
+    uploadQueue.value = uploadQueue.value.filter((item) => item.name !== name);
+  }
+
+  // Add a new method to remove by ID (more reliable)
+  function removeUploadById(id: string): void {
+    // Remove from preview list (shouldn't have IDs, but for completeness)
+    uploadPreviewList.value = uploadPreviewList.value.filter(
+      (item) => !('id' in item) || item.id !== id,
+    );
+
+    // Remove from queue
+    uploadQueue.value = uploadQueue.value.filter((item) => item.id !== id);
+
+    // Remove from progress list
+    uploadProgressList.value = uploadProgressList.value.filter((item) => item.id !== id);
   }
 
   /**
    * Clear the upload preview list
    */
-  function clearUploadList() {
+  function clearUploadList(): void {
     uploadPreviewList.value = [];
   }
 
   /**
    * Handle file name changes inside the upload preview list
    */
-  function changeFileName(file: UploadPreviewEntry) {
+  function changeFileName(file: UploadPreviewEntry): boolean {
     if (!file.edit_name || file.edit_name === file.name) {
       file.edit = false;
       return true;
@@ -302,359 +447,394 @@ export const useUploadStore = defineStore('upload', () => {
     return false;
   }
 
+  // ========================================
+  // UPLOAD PREPARATION METHODS
+  // ========================================
+
+  // Fix createUploadProgressEntries to ensure unique names
+  function createUploadProgressEntries(): AnyUploadProgressEntry[] {
+    const progressEntries: AnyUploadProgressEntry[] = [];
+
+    for (const item of uploadPreviewList.value) {
+      const uploadId = generateUniqueUploadId();
+      if (item.type === 'file' && item.content instanceof File) {
+        const file = item.content;
+        // Check file size limits
+        if (file.size > MAX_FILE_SIZE) {
+          q.notify({
+            type: 'negative',
+            message: `File "${item.name}" exceeds the maximum upload limit of ${fileSizeDecimal(MAX_FILE_SIZE)}.`,
+          });
+          continue;
+        }
+
+        // Create appropriate progress entry based on file size
+        if (file.size >= CHUNKED_UPLOAD_THRESHOLD) {
+          // Create chunked upload entry
+          const chunkedEntry: ChunkedUploadProgressEntry = reactive({
+            id: uploadId,
+            name: item.name, // Use validated name
+            parentId: item.parentId,
+            type: 'file',
+            content: file,
+            mimeType: file.type,
+            sizeBytes: file.size,
+            status: UploadStatus.QUEUED,
+            message: 'Queued for upload...',
+            uploadedBytes: 0,
+            uploadSpeed: 0,
+            chunks: [],
+          });
+
+          progressEntries.push(chunkedEntry);
+        } else {
+          // Create regular upload entry
+          const source = axios.CancelToken.source();
+          const regularEntry: RegularUploadProgressEntry = reactive({
+            id: uploadId,
+            name: item.name, // Use validated name
+            parentId: item.parentId,
+            type: 'file',
+            content: file,
+            mimeType: file.type,
+            sizeBytes: file.size,
+            status: UploadStatus.QUEUED,
+            message: 'Queued for upload...',
+            uploadedBytes: 0,
+            uploadSpeed: 0,
+            cancelToken: source,
+          });
+
+          progressEntries.push(regularEntry);
+        }
+      } else if (item.type === 'folder' && item.content instanceof FileSystemDirectoryEntry) {
+        const folder = item.content;
+        const folderEntry: FolderUploadProgressEntry = reactive({
+          id: uploadId,
+          name: item.name, // Use validated name
+          parentId: item.parentId,
+          type: 'folder',
+          content: folder,
+          mimeType: 'inode/directory',
+          sizeBytes: 0,
+          status: UploadStatus.QUEUED,
+          message: 'Queued for upload...',
+          uploadedBytes: 0,
+          uploadSpeed: 0,
+          // trackers
+          structureInitialized: false,
+          foldersInitialized: false,
+          nodes: [] as AnyTrackerNode[],
+          nodeProgressTypeMap: new Map<
+            string,
+            RegularUploadProgressEntry | ChunkedUploadProgressEntry
+          >(),
+        });
+        progressEntries.push(folderEntry);
+      }
+    }
+
+    return progressEntries;
+  }
+
+  // ========================================
+  // UPLOAD EXECUTION METHODS
+  // ========================================
+
   /**
-   * Start uploading from dialog
+   * Start uploading from dialog - now with sequential processing
    */
-  async function startUploadFromDialog() {
+  function uploadFromPreviewList(): void {
     if (uploadPreviewList.value.length === 0) return;
 
     uploadDialogOpen.value = false;
-    uploadInProgress.value = true;
+    showProgressDialog.value = true;
 
     try {
-      const parentId = fileOps.rawFolderContent.id;
+      // Create all upload progress entries first
+      const progressEntries = createUploadProgressEntries();
 
-      for (const item of uploadPreviewList.value) {
-        if (item.type === 'file') {
-          await uploadFile(item, parentId);
-        } else if (item.type === 'folder') {
-          await uploadFolder(item, parentId);
-        }
-      }
+      // Add all entries to the queue
+      uploadQueue.value.push(...progressEntries);
 
-      // Clean up completed uploads
+      // Clear the preview list immediately so user can add more files
       clearUploadList();
 
-      if (!hasActiveChunkedUploads.value) {
-        uploadInProgress.value = false;
-      }
+      // Trigger processing immediately
+      triggerUploadProcessing();
     } catch (error: any) {
       q.notify({
         type: 'negative',
         message: error.message || 'Upload failed',
       });
-      uploadInProgress.value = false;
     }
   }
 
   /**
-   * Upload a single file
-   *
-   * Handles both regular and chunked uploads based on file size
+   * Execute a regular upload
    */
-  async function uploadFile(fileItem: UploadPreviewEntry, parentId: string): Promise<boolean> {
-    if (fileItem.content instanceof FileSystemEntry) return false;
-
-    const file = fileItem.content;
-    const itemSize = file.size;
-
-    // Check file size limits
-    if (itemSize > MAX_FILE_SIZE) {
-      q.notify({
-        type: 'negative',
-        message: `File "${fileItem.name}" exceeds the maximum upload limit of ${fileSizeDecimal(
-          MAX_FILE_SIZE,
-        )}.`,
-      });
-      return false;
-    }
-
-    // Use chunked upload for large files
-    if (itemSize >= CHUNKED_UPLOAD_THRESHOLD) {
-      try {
-        await startChunkedUpload(file, parentId);
-        return true;
-      } catch (error: any) {
-        q.notify({
-          type: 'negative',
-          message: `Chunked upload failed for "${fileItem.name}": ${error.message}`,
-        });
-        return false;
-      }
-    }
-
-    // Use regular upload for smaller files
-    return await regularUpload(fileItem, parentId);
-  }
-
-  /**
-   * Regular upload for smaller files
-   */
-  async function regularUpload(fileItem: UploadPreviewEntry, parentId: string): Promise<boolean> {
-    const file = fileItem.content as File;
-
+  async function executeRegularUpload(upload: RegularUploadProgressEntry): Promise<boolean> {
     const formData = new FormData();
-    // use snake case in form data because camelcase serializer doesn't work for somer reason
-    formData.append('name', fileItem.name);
-    formData.append('parent_id', parentId);
+    formData.append('name', upload.name);
+    formData.append('parent_id', upload.parentId);
     formData.append('node_type', 'file');
-    formData.append('file_content', file);
-
-    const source = axios.CancelToken.source();
-
-    const fileProgress: UploadProgressEntry = reactive({
-      name: fileItem.name,
-      status: 'loading',
-      message: '',
-      abort: source,
-      size: fileSizeDecimal(file.size),
-      transferred: '0B',
-      transferredPercent: 0,
-    });
-
-    uploadProgessList.value.push(fileProgress);
-
-    const config = {
-      withCredentials: true,
-      onUploadProgress: (progressEvent: ProgressEvent) => {
-        fileProgress.transferred = fileSizeDecimal(progressEvent.loaded);
-        fileProgress.transferredPercent = progressEvent.loaded / file.size;
-      },
-      cancelToken: source.token,
-      headers: {
-        'X-CSRFToken': q.cookies.get('csrftoken'),
-        // 'Content-Type': 'multipart/form-data',
-      },
-    };
+    formData.append('file_content', upload.content);
 
     try {
+      upload.status = UploadStatus.PREPARING;
+      upload.message = 'Preparing upload...';
+
+      upload.status = UploadStatus.UPLOADING;
+      upload.message = 'Uploading...';
+
+      const config = {
+        withCredentials: true,
+        onUploadProgress: (progressEvent: ProgressEvent) => {
+          upload.uploadedBytes = progressEvent.loaded;
+        },
+        cancelToken: upload.cancelToken.token,
+        headers: {
+          'X-CSRFToken': q.cookies.get('csrftoken'),
+        },
+      };
+
+      console.log(`Starting upload for ${upload.name} (${fileSizeDecimal(upload.sizeBytes)})`);
+
       const apiData = await apiPost('files/nodes/', formData, config);
 
       if (apiData.error === false) {
-        fileProgress.status = 'ok';
-        fileProgress.transferredPercent = 1;
-        fileProgress.message = 'Upload completed';
-
-        // Refresh folder after successful upload
+        upload.status = UploadStatus.COMPLETED;
+        upload.uploadedBytes = upload.sizeBytes;
+        upload.message = 'Upload completed';
         await fileOps.refreshFolder();
-
         return true;
       } else {
-        fileProgress.status = 'error';
-        fileProgress.transferredPercent = 0;
-        fileProgress.message = apiData.errorMessage;
-        return false;
+        upload.status = UploadStatus.FAILED;
+        upload.message = apiData.errorMessage || 'Upload failed';
       }
     } catch (error: any) {
-      if (!axios.isCancel(error)) {
-        fileProgress.status = 'error';
-        fileProgress.transferredPercent = 0;
-        fileProgress.message = error.message || 'Upload failed';
+      if (axios.isCancel(error)) {
+        upload.status = UploadStatus.CANCELED;
+        upload.message = 'Upload canceled';
+      } else {
+        upload.status = UploadStatus.FAILED;
+        upload.message = error.message || 'Upload failed';
       }
+    }
+    return false;
+  }
+
+  /**
+   * Execute a chunked upload
+   */
+  async function executeChunkedUpload(upload: ChunkedUploadProgressEntry): Promise<boolean> {
+    try {
+      upload.status = UploadStatus.PREPARING;
+      upload.message = 'Initializing chunked upload...';
+
+      // Initialize chunked upload
+      await chunkedUpload.initUpload(upload);
+
+      // Start upload and await completion
+      await chunkedUpload.startUpload(upload);
+
+      // Upload completed successfully
+      upload.status = UploadStatus.COMPLETED;
+      upload.uploadedBytes = upload.sizeBytes;
+      upload.message = 'Upload completed';
+
+      // Refresh folder
+      await fileOps.refreshFolder();
+
+      q.notify({
+        type: 'positive',
+        message: `Upload completed: ${upload.name}`,
+        timeout: 3000,
+      });
+
+      return true;
+    } catch (error: any) {
+      upload.status = UploadStatus.FAILED;
+      upload.message = error.message || 'Chunked upload failed';
+      q.notify({
+        type: 'negative',
+        message: `Upload failed: ${upload.name} - ${error.message}`,
+        timeout: 5000,
+      });
+
       return false;
     }
   }
 
-  function cancelRegularUpload(index: number) {
-    const upload = uploadProgessList.value[index];
-    if (upload && upload.abort) {
-      upload.abort.cancel('Upload cancelled by user');
-      upload.status = 'error';
-      upload.message = 'Cancelled';
-    }
-  }
-
-  function cancelRegularUploadByName(name: string) {
-    const index = uploadProgessList.value.findIndex((upload) => upload.name === name);
-    if (index !== -1) {
-      cancelRegularUpload(index);
-    }
-  }
-
-  function cancelAllRegularUploads() {
-    uploadProgessList.value.forEach((upload, index) => {
-      if (upload.status === 'loading') {
-        cancelRegularUpload(index);
-      }
-    });
-  }
-
-  function clearCompletedRegularUploads() {
-    uploadProgessList.value = uploadProgessList.value.filter(
-      (upload) => upload.status === 'loading',
-    );
-  }
-
-  /**
-   * Upload a folder (recursive)
-   */
-  /* eslint-disable */
-
-  async function uploadFolder(folderItem: UploadPreviewEntry, parentId: string): Promise<boolean> {
-    // Implementation for folder upload
-    // This would require recursive handling of folder contents
-    q.notify({
-      type: 'info',
-      message: 'Folder upload not yet implemented',
-    });
-    return false;
-  }
-  /* eslint-enable */
-
-  /**
-   * Cancel a regular upload
-   */
-  function cancelUpload(index: number) {
-    const upload = uploadProgessList.value[index];
-    if (upload && upload.abort) {
-      upload.abort.cancel('Upload cancelled by user');
-      upload.status = 'error';
-      upload.message = 'Cancelled';
-    }
-  }
-
-  /**
-   * Clear completed regular uploads
-   */
-  function clearCompletedUploads() {
-    uploadProgessList.value = uploadProgessList.value.filter(
-      (upload) => upload.status === 'loading',
-    );
-  }
-
-  /**
-   * Clear all regular uploads
-   */
-  function clearAllUploads() {
-    // Cancel any active uploads
-    uploadProgessList.value.forEach((upload, index) => {
-      if (upload.status === 'loading') {
-        cancelUpload(index);
-      }
-    });
-
-    uploadProgessList.value = [];
-    uploadInProgress.value = false;
-  }
-
-  // ========================================
-  // CHUNKED UPLOAD METHODS
-  // ========================================
-
-  /**
-   * Initialize chunked uploads from storage
-   */
-  function initializeChunkedUploads() {
+  async function executeFolderUpload(upload: FolderUploadProgressEntry): Promise<boolean> {
     try {
-      refreshChunkedUploadsList();
-    } catch (error: any) {
-      console.warn('Failed to restore chunked upload state:', error);
-    }
-  }
+      upload.message = 'Processing folder...';
 
-  /**
-   * Refresh chunked uploads list from manager
-   */
-  function refreshChunkedUploadsList() {
-    chunkedUploads.value = ChunkedUploadManager.getAllUploads();
-  }
-
-  /**
-   * Start a chunked upload
-   */
-  async function startChunkedUpload(file: File, parentId: string): Promise<UploadTrackingInfo> {
-    try {
-      showChunkedProgress.value = true;
-
-      // Initialize the upload
-      const uploadInfo = await ChunkedUploadManager.initUpload(file, parentId);
-      refreshChunkedUploadsList();
-
-      // Start the upload
-      await ChunkedUploadManager.startUpload(uploadInfo.id);
-      refreshChunkedUploadsList();
-
-      // Monitor progress
-      monitorChunkedUpload(uploadInfo.id);
-
-      return uploadInfo;
-    } catch (error: any) {
-      throw new Error(`Failed to start chunked upload: ${error.message}`);
-    }
-  }
-
-  /**
-   * Monitor chunked upload progress
-   */
-  function monitorChunkedUpload(uploadId: string) {
-    const interval = setInterval(() => {
-      refreshChunkedUploadsList();
-      const upload = ChunkedUploadManager.getUpload(uploadId);
-
-      if (!upload) {
-        clearInterval(interval);
-        return;
-      }
-
-      // Check if upload is finished
-      if (upload.status === UploadStatus.COMPLETED) {
-        clearInterval(interval);
-        q.notify({
-          type: 'positive',
-          message: `Upload completed: ${upload.name}`,
-          timeout: 3000,
-        });
-
-        // Refresh the file list
-        fileOps.refreshFolder().catch(console.error);
-
-        // Save state and clean up after delay
-        setTimeout(() => {
-          autoCleanupCompleted();
-        }, 5000);
-      } else if (upload.status === UploadStatus.FAILED) {
-        clearInterval(interval);
+      console.log(`Starting folder upload for ${upload.name}`);
+      // create basic structure
+      const structureSuccess = await folderUpload.initializeStructure(upload);
+      if (!structureSuccess) {
+        upload.status = UploadStatus.FAILED;
+        upload.message = 'Failed to initialize folder structure';
         q.notify({
           type: 'negative',
-          message: `Upload failed: ${upload.name} - ${upload.message}`,
-          timeout: 5000,
+          message: `Folder processing failed: ${upload.name}`,
         });
-      } else if (upload.status === UploadStatus.CANCELED) {
-        clearInterval(interval);
+        return false;
+      }
+
+      console.log(`Folder ${upload.name} has ${upload.nodes.length} nodes`);
+
+      upload.structureInitialized = true;
+
+      upload.message = 'Creating folder structure...';
+      // create folders
+      const folderSuccess = await folderUpload.initializeFolders(upload);
+      if (!folderSuccess) {
+        upload.status = UploadStatus.FAILED;
+        upload.message = 'Failed creating folder structure';
         q.notify({
-          type: 'info',
-          message: `Upload canceled: ${upload.name}`,
-          timeout: 3000,
+          type: 'negative',
+          message: `Folder creation failed: ${upload.name}`,
         });
+        return false;
+      }
+      upload.foldersInitialized = true;
+
+      upload.message = 'Assigning folders...';
+      const assignSuccess = folderUpload.assignRemoteParentIds(upload);
+      if (!assignSuccess) {
+        upload.status = UploadStatus.FAILED;
+        upload.message = 'Failed assigning folders';
+        q.notify({
+          type: 'negative',
+          message: `Folder creation failed: ${upload.name}`,
+        });
+        return false;
       }
 
-      // Update overall upload progress state
-      if (!hasActiveChunkedUploads.value && !hasActiveRegularUploads.value) {
-        uploadInProgress.value = false;
-      }
-    }, 1000); // Update every second
-  }
+      const fileUploadEntries = folderUpload.createFileUploadEntries(upload);
+      console.log(
+        `Created ${fileUploadEntries.length} file upload entries for folder ${upload.name}`,
+      );
 
-  /**
-   * Cancel a chunked upload
-   */
-  async function cancelChunkedUpload(uploadId: string): Promise<void> {
-    try {
-      await ChunkedUploadManager.cancelUpload(uploadId);
-      refreshChunkedUploadsList();
+      upload.message = 'Uploading files...';
+      uploadQueue.value.push(...fileUploadEntries);
+
+      folderUpload.trackFolderCompletion(upload, {
+        onProgress: (completed, total, failed, canceled) => {
+          upload.message = `${completed}/${total} files uploaded${failed > 0 ? ` (${failed} failed)` : ''}`;
+          upload.uploadedBytes = Math.floor((completed / total) * upload.sizeBytes);
+        },
+        onComplete: (completed, total, failed, canceled) => {
+          if (failed > 0) {
+            upload.status = UploadStatus.FAILED;
+          } else {
+            upload.status = UploadStatus.COMPLETED;
+          }
+        },
+      });
+
+      // return true;
     } catch (error: any) {
+      console.error(`Folder upload failed for ${upload.name}:`, error);
+      upload.status = UploadStatus.FAILED;
+      upload.message = error.message || 'Folder processing failed';
+
       q.notify({
         type: 'negative',
-        message: `Failed to cancel upload: ${error.message}`,
+        message: `Folder processing failed: ${upload.name} - ${error.message}`,
         timeout: 5000,
       });
+
+      return false;
     }
   }
 
+  // ========================================
+  // UPLOAD CONTROL METHODS
+  // ========================================
+
   /**
-   * Retry a failed chunked upload
+   * Cancel any upload by ID
+   *
+   * @param uploadId - The ID of the upload to cancel
    */
-  async function retryChunkedUpload(uploadId: string): Promise<void> {
+  async function cancelUpload(uploadId: string): Promise<void> {
+    // Check if it's in the queue
+    const queueIndex = uploadQueue.value.findIndex((u) => u.id === uploadId);
+    if (queueIndex !== -1) {
+      const upload = uploadQueue.value[queueIndex]!;
+      upload.status = UploadStatus.CANCELED;
+      upload.message = 'Canceled';
+
+      // Move to progress list for display
+      uploadQueue.value.splice(queueIndex, 1);
+      uploadProgressList.value.push(upload);
+
+      // Trigger processing to handle remaining queue
+      triggerUploadProcessing();
+      return;
+    }
+
+    // Check if it's in active uploads
+    const upload = uploadProgressList.value.find((u) => u.id === uploadId);
+    if (!upload) return;
+
+    if (isFolderUpload(upload)) {
+      // Cancel folder upload
+      upload.status = UploadStatus.CANCELED;
+      upload.message = 'Folder upload canceled';
+    } else if (isRegularUpload(upload)) {
+      upload.status = UploadStatus.CANCELED;
+      upload.message = 'Upload canceled';
+      upload.cancelToken.cancel('Upload canceled by user');
+    } else if (isChunkedUpload(upload)) {
+      upload.status = UploadStatus.CANCELED;
+      upload.message = 'Upload canceled';
+      await chunkedUpload.cancelUpload(upload);
+    }
+
+    // Trigger processing to handle remaining queue
+    triggerUploadProcessing();
+  }
+
+  /**
+   * Retry a failed upload
+   */
+  async function retryUpload(uploadId: string): Promise<void> {
     try {
-      // Reset the upload status and try again
-      const upload = ChunkedUploadManager.getUpload(uploadId);
-      if (upload) {
-        upload.status = UploadStatus.QUEUED;
-        upload.message = '';
-        await ChunkedUploadManager.startUpload(uploadId);
-        monitorChunkedUpload(uploadId);
-        refreshChunkedUploadsList();
+      const upload = uploadProgressList.value.find((u) => u.id === uploadId);
+      if (!upload) {
+        throw new Error('Upload not found');
       }
+
+      // Reset status
+      upload.status = UploadStatus.QUEUED;
+      upload.message = 'Queued for retry...';
+      upload.uploadedBytes = 0;
+
+      // Reset chunks if it's a chunked upload
+      if (isChunkedUpload(upload)) {
+        upload.chunks = [];
+        delete upload.sessionInfo;
+      }
+
+      // Remove from progress list and add back to queue
+      const progressIndex = uploadProgressList.value.findIndex((u) => u.id === uploadId);
+      if (progressIndex !== -1) {
+        uploadProgressList.value.splice(progressIndex, 1);
+        uploadQueue.value.unshift(upload);
+      }
+
+      // Trigger processing
+      triggerUploadProcessing();
+
+      q.notify({
+        type: 'positive',
+        message: `Retrying upload: ${upload.name}`,
+        timeout: 3000,
+      });
     } catch (error: any) {
       q.notify({
         type: 'negative',
@@ -664,68 +844,73 @@ export const useUploadStore = defineStore('upload', () => {
     }
   }
 
-  /**
-   * Remove completed chunked uploads
-   */
-  function removeCompletedChunkedUploads() {
-    const completedIds = chunkedUploads.value
-      .filter((upload) => upload.status === UploadStatus.COMPLETED)
-      .map((upload) => upload.id);
-
-    completedIds.forEach((id) => {
-      ChunkedUploadManager.removeUpload(id);
-    });
-
-    refreshChunkedUploadsList();
-
-    if (chunkedUploads.value.length === 0) {
-      showChunkedProgress.value = false;
-    }
-  }
+  // ========================================
+  // CLEANUP METHODS
+  // ========================================
 
   /**
-   * Clear all chunked uploads
+   * Clear completed uploads
    */
-  function clearAllChunkedUploads() {
-    // Cancel active uploads first
-    const activeUploads = chunkedUploads.value.filter((upload) =>
-      [UploadStatus.UPLOADING, UploadStatus.QUEUED].includes(upload.status),
+  function clearCompletedUploads(): void {
+    uploadProgressList.value = uploadProgressList.value.filter(
+      (upload) => upload.status !== UploadStatus.COMPLETED,
     );
-
-    activeUploads.forEach((upload) => {
-      ChunkedUploadManager.cancelUpload(upload.id).catch(console.error);
-    });
-
-    // Clear all uploads
-    ChunkedUploadManager.clearAllUploads();
-    chunkedUploads.value = [];
-    showChunkedProgress.value = false;
   }
 
   /**
-   * Auto cleanup completed uploads after some time
+   * Enhanced cleanup that stops processing
    */
-  function autoCleanupCompleted() {
-    if (completedChunkedUploads.value.length > 5) {
-      // Keep only the 3 most recent completed uploads
-      const sortedCompleted = completedChunkedUploads.value.sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-      );
+  async function clearAllUploads(): Promise<void> {
+    console.log('Clearing all uploads...');
 
-      const toRemove = sortedCompleted.slice(3);
-      toRemove.forEach((upload) => {
-        ChunkedUploadManager.removeUpload(upload.id);
+    // Stop any scheduled processing
+    processingScheduled.value = false;
+    isProcessorActive.value = false;
+
+    // Cancel active uploads first
+    const activePromises: Promise<void>[] = [];
+
+    uploadProgressList.value.forEach((upload) => {
+      if ([UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(upload.status)) {
+        if (isRegularUpload(upload)) {
+          upload.cancelToken.cancel('Upload canceled');
+          upload.status = UploadStatus.CANCELED;
+          upload.message = 'Canceled';
+        } else if (isChunkedUpload(upload)) {
+          upload.status = UploadStatus.CANCELED;
+          upload.message = 'Canceled';
+          activePromises.push(chunkedUpload.cancelUpload(upload).catch(console.error));
+        } else if (isFolderUpload(upload)) {
+          upload.status = UploadStatus.CANCELED;
+          upload.message = 'Canceled';
+        }
+      }
+    });
+
+    // Cancel queued uploads
+    uploadQueue.value.forEach((upload) => {
+      upload.status = UploadStatus.CANCELED;
+      upload.message = 'Canceled';
+    });
+
+    // Wait for chunked upload cancellations (with timeout)
+    if (activePromises.length > 0) {
+      const timeoutPromise = new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 5000); // 5 second timeout
       });
 
-      refreshChunkedUploadsList();
+      await Promise.race([Promise.allSettled(activePromises), timeoutPromise]);
     }
-  }
 
-  /**
-   * Toggle chunked progress visibility
-   */
-  function toggleChunkedProgress() {
-    showChunkedProgress.value = !showChunkedProgress.value;
+    // Clear everything
+    uploadProgressList.value = [];
+    uploadQueue.value = [];
+    showProgressDialog.value = false;
+
+    q.notify({
+      type: 'info',
+      message: 'All uploads have been canceled',
+    });
   }
 
   // ========================================
@@ -736,41 +921,19 @@ export const useUploadStore = defineStore('upload', () => {
    * Get upload statistics
    */
   function getUploadStats() {
-    const regular = {
-      total: uploadProgessList.value.length,
-      active: uploadProgessList.value.filter((u) => u.status === 'loading').length,
-      completed: uploadProgessList.value.filter((u) => u.status === 'ok').length,
-      failed: uploadProgessList.value.filter((u) => u.status === 'error').length,
-    };
+    const allUploads = [...uploadQueue.value, ...uploadProgressList.value];
 
-    const chunked = {
-      total: chunkedUploads.value.length,
-      active: chunkedUploads.value.filter((u) =>
-        [UploadStatus.UPLOADING, UploadStatus.QUEUED, UploadStatus.PREPARING].includes(u.status),
+    return {
+      total: allUploads.length,
+      queued: uploadQueue.value.filter((u) => u.status === UploadStatus.QUEUED).length,
+      active: uploadProgressList.value.filter((u) =>
+        [UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(u.status),
       ).length,
-      completed: completedChunkedUploads.value.length,
-      failed: failedChunkedUploads.value.length,
+      completed: uploadProgressList.value.filter((u) => u.status === UploadStatus.COMPLETED).length,
+      failed: uploadProgressList.value.filter((u) => u.status === UploadStatus.FAILED).length,
+      canceled: allUploads.filter((u) => u.status === UploadStatus.CANCELED).length,
     };
-
-    return { regular, chunked };
   }
-
-  /**
-   * Reset all upload state
-   */
-  function resetUploadState() {
-    clearAllUploads();
-    clearAllChunkedUploads();
-    uploadDialogOpen.value = false;
-    uploadInProgress.value = false;
-  }
-
-  // ========================================
-  // INITIALIZATION
-  // ========================================
-
-  // Initialize chunked uploads on store creation
-  initializeChunkedUploads();
 
   // ========================================
   // RETURN STORE INTERFACE
@@ -779,47 +942,46 @@ export const useUploadStore = defineStore('upload', () => {
   return {
     // State
     uploadPreviewList,
-    uploadProgessList,
+    uploadProgressList,
+    uploadQueue,
     uploadInProgress,
     uploadDialogOpen,
-    chunkedUploads,
-    showChunkedProgress,
+    showProgressDialog,
+    maxConcurrentUploads,
 
     // Computed
     hasUploads,
+    hasActiveUploads,
     hasActiveRegularUploads,
     hasActiveChunkedUploads,
-    hasAnyActiveUploads,
-    completedChunkedUploads,
-    failedChunkedUploads,
+    completedUploads,
+    failedUploads,
     totalUploadProgress,
+    queuedUploads,
+    activeUploads,
 
-    // Regular upload methods
+    // Upload preview methods
     addUploadEntry,
     removeUploadEntry,
     changeFileName,
     clearUploadList,
-    startUploadFromDialog,
-    uploadFile,
+
+    // Upload execution methods
+    uploadFromPreviewList,
+
+    // Upload control methods
     cancelUpload,
+    retryUpload,
+    removeUploadById,
+
+    // Cleanup methods
     clearCompletedUploads,
     clearAllUploads,
 
-    // Chunked upload methods
-    startChunkedUpload,
-    cancelChunkedUpload,
-    retryChunkedUpload,
-    removeCompletedChunkedUploads,
-    clearAllChunkedUploads,
-    refreshChunkedUploadsList,
-    toggleChunkedProgress,
-
     // Utility methods
     getUploadStats,
-    resetUploadState,
 
-    // Constants (for external access)
-    MAX_FILE_SIZE,
+    // Constants
     CHUNKED_UPLOAD_THRESHOLD,
   };
 });

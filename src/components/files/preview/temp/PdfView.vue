@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-import { defineProps, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useQuasar } from 'quasar';
 
 const props = defineProps({

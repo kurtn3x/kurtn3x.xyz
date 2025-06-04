@@ -1,16 +1,16 @@
-import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
-import { apiGet, apiPost, apiDelete, apiPatch } from 'src/api/apiWrapper';
+import { defineStore } from 'pinia';
+import { apiDelete, apiGet, apiPatch, apiPost } from 'src/api/apiWrapper';
+import { useLocalStore } from '../localStore';
+import { useNavigationStore } from './navigationStore';
+import { useSelectionStore } from './selectionStore';
 import type { FileNode, FileNodeFolder, FolderTreeNode } from 'src/types/apiTypes';
 import { isFolder } from 'src/types/apiTypes';
-import { useSelectionStore } from './selectionStore';
-import { useNavigationStore } from './navigationStore';
-import { useLocalStore } from '../localStore';
 import {
   createMockFolderHierarchy,
-  mockFolderDatabase,
   initializeMockFolderDatabase,
+  mockFolderDatabase,
 } from 'src/types/mockfolder';
 
 export const useFileOperationsStore = defineStore('fileOperations', () => {
@@ -181,7 +181,10 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
   async function createFolder(name: string, parentId: string) {
     if (!validName(name)) {
       q.notify({ type: 'negative', message: 'Invalid name' });
-      return false;
+      return {
+        successful: false,
+        data: null,
+      };
     }
 
     const apiData = await apiPost(
@@ -196,18 +199,31 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
 
     if (apiData.error === false) {
       q.notify({ type: 'positive', message: 'Folder created' });
-      await refreshFolder();
+
+      // Apply immediatly to the store
+      if (rawFolderContent.value.id === parentId) {
+        rawFolderContent.value.children.push(apiData.data as FileNode);
+      } else {
+        // maybe do nothing, idk this is not used
+        await refreshFolder();
+      }
     } else {
       q.notify({ type: 'negative', message: apiData.errorMessage });
     }
 
-    return !apiData.error;
+    return {
+      successful: !apiData.error,
+      data: apiData.data as FileNode | null,
+    };
   }
 
   async function createFile(name: string, mime: string, parentId: string) {
     if (!validName(name)) {
       q.notify({ type: 'negative', message: 'Invalid name' });
-      return false;
+      return {
+        successful: false,
+        data: null,
+      };
     }
 
     const file = new File([''], name);
@@ -233,12 +249,22 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
 
     if (apiData.error === false) {
       q.notify({ type: 'positive', message: 'File created' });
-      await refreshFolder();
+
+      if (rawFolderContent.value.id === parentId) {
+        // Apply immediatly to the store
+        rawFolderContent.value.children.push(apiData.data as FileNode);
+      } else {
+        // maybe do nothing, idk this is not used
+        await refreshFolder();
+      }
     } else {
       q.notify({ type: 'negative', message: apiData.errorMessage });
     }
 
-    return !apiData.error;
+    return {
+      successful: !apiData.error,
+      data: apiData.data as FileNode | null,
+    };
   }
 
   // Function that deletes a folder or file

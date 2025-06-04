@@ -181,7 +181,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { QTree } from 'quasar';
+import { QTree, useQuasar } from 'quasar';
 import { useLocalStore } from 'stores/localStore';
 import { useFileStore } from 'src/stores/fileStore';
 import type { FileNode } from 'src/types/apiTypes';
@@ -204,6 +204,8 @@ const props = defineProps({
 
 // Define emits
 const emit = defineEmits(['updated']);
+
+const q = useQuasar();
 
 // Setup stores and utilities
 const localStore = useLocalStore();
@@ -231,6 +233,14 @@ function collapseTree() {
 
 async function moveItems() {
   localLoading.value = true;
+
+  if (selectedId.value === fileStore.fileOps.rawFolderContent.id) {
+    q.notify({
+      type: 'positive',
+      message: 'Files are already in this folder',
+    });
+    return;
+  }
 
   if (props.moveSelection) {
     const movePromises = fileStore.selection.selectedItemsArray.map(async (item) => {

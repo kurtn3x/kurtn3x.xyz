@@ -520,21 +520,24 @@ function handleCheckboxClick(item: FileNode): void {
 
 async function createNewItem(): Promise<void> {
   localLoading.value = true;
-  let successful = false;
+  let creation = {
+    successful: false,
+    data: null as FileNode | null,
+  };
   if (filesStore.fileOps.newItem.type === 'folder') {
-    successful = await filesStore.fileOps.createFolder(
+    creation = await filesStore.fileOps.createFolder(
       filesStore.fileOps.newItem.name,
       filesStore.fileOps.rawFolderContent.id,
     );
   } else if (filesStore.fileOps.newItem.type === 'file') {
-    successful = await filesStore.fileOps.createFile(
+    creation = await filesStore.fileOps.createFile(
       filesStore.fileOps.newItem.name,
       filesStore.fileOps.newItem.mime,
       filesStore.fileOps.rawFolderContent.id,
     );
   }
 
-  if (successful) {
+  if (creation.successful) {
     resetNewItem();
   }
   localLoading.value = false;

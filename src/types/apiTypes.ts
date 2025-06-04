@@ -164,13 +164,10 @@ export type UploadSession = {
   chunkSize: number;
   totalChunks: number;
   uploadedChunks: number;
-  status: 'CREATED' | 'UPLOADING' | 'COMPLETED' | 'FAILED' | 'CANCELED';
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
-  progress: number; // Progress percentage (0-100)
-  resumeToken: string;
-  expiresAt: string; // ISO date string
-  user: string; // User ID
+  status: 'UPLOADING' | 'COMPLETED' | 'FAILED' | 'CANCELED'; // Removed 'ESTABLISHED'
+  createdAt: string;
+  progress: number;
+  user: string;
 };
 
 /**

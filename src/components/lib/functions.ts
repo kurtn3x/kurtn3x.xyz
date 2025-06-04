@@ -48,3 +48,19 @@ export function transferedPercentLabel(num: number) {
     return Math.round(num * 100) + '%';
   }
 }
+
+export function generateUniqueUploadId(): string {
+  // Use crypto.randomUUID if available, fallback to improved random generation
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `upload_${crypto.randomUUID()}`;
+  }
+
+  // Fallback with higher entropy
+  const timestamp = Date.now();
+  const randomPart1 = Math.random().toString(36).substring(2, 15);
+  const randomPart2 = Math.random().toString(36).substring(2, 15);
+  const counter = ((generateUniqueUploadId as any).counter =
+    ((generateUniqueUploadId as any).counter || 0) + 1);
+
+  return `upload_${timestamp}_${counter}_${randomPart1}_${randomPart2}`;
+}
