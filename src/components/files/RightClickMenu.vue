@@ -224,7 +224,7 @@ async function deleteItem() {
 async function clearSharingPassword() {
   await filesStore.fileOps.updateSharingPassword(props.propItem.id, {
     isPasswordProtected: false,
-    sharedPassword: '',
+    password: '',
   });
 }
 

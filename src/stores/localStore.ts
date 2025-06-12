@@ -4,9 +4,9 @@ import { LocalStorage, useQuasar } from 'quasar';
 import { defineStore } from 'pinia';
 import type { ThemeName } from 'src/components/lib/themes';
 import { getThemeBackground } from 'src/components/lib/themes';
+import { apiGet, apiPost } from '../api/apiWrapper';
 import type { HeaderInfo } from 'src/types/apiTypes';
 import { getTestHeaderInfo } from 'src/types/test';
-import { apiGet, apiPost } from '../api/apiWrapper';
 
 export const useLocalStore = defineStore('header', () => {
   const q = useQuasar();
@@ -42,6 +42,9 @@ export const useLocalStore = defineStore('header', () => {
   const isDebugMode = computed(() => debugMode.value);
   const isDarkMode = computed(() => darkMode.value);
   const themeBackground = computed(() => getThemeBackground(theme.value as ThemeName));
+
+  const isMobile = computed(() => q.platform.is.mobile);
+  const isSmallWidth = computed(() => q.screen.lt.sm);
 
   function toggleDebugMode() {
     debugMode.value = !debugMode.value;
@@ -118,6 +121,7 @@ export const useLocalStore = defineStore('header', () => {
       });
       await fetchCsrfToken();
       await clearAll();
+      window.location.reload();
     } else {
       q.notify({
         type: 'negative',
@@ -237,6 +241,8 @@ export const useLocalStore = defineStore('header', () => {
     isDebugMode,
     themeBackground,
     isDarkMode,
+    isMobile,
+    isSmallWidth,
 
     // Actions
     toggleDebugMode,

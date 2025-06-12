@@ -178,7 +178,7 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
   }
 
   // Functions that create a folder or file
-  async function createFolder(name: string, parentId: string) {
+  async function createFolder(name: string, parentId: string, forceRefresh = true) {
     if (!validName(name)) {
       q.notify({ type: 'negative', message: 'Invalid name' });
       return {
@@ -202,8 +202,10 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
 
       // Apply immediatly to the store
       if (rawFolderContent.value.id === parentId) {
-        rawFolderContent.value.children.push(apiData.data as FileNode);
-      } else {
+        const tempNode = apiData.data as FileNode;
+        tempNode.selected = false;
+        rawFolderContent.value.children.push(tempNode);
+      } else if (forceRefresh) {
         // maybe do nothing, idk this is not used
         await refreshFolder();
       }
@@ -230,29 +232,23 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
     const formData = new FormData();
 
     // this was snake case before, check if this works
-    formData.append('file', file);
-    formData.append('nodeType', 'file');
-    formData.append('parentId', parentId);
+    formData.append('file_content', file);
+    formData.append('node_type', 'file');
+    formData.append('parent_id', parentId);
     formData.append('name', name);
-    formData.append('mimeType', mime);
-    formData.append('sizeBytes', '0');
+    formData.append('mime_type', mime);
+    formData.append('size_bytes', '0');
 
-    const config = {
-      ...axiosConfig,
-      headers: {
-        ...axiosConfig.headers,
-        'Content-Type': 'multipart/form-data',
-      },
-    };
-
-    const apiData = await apiPost('/files/nodes/', formData, config);
+    const apiData = await apiPost('/files/nodes/', formData, axiosConfig);
 
     if (apiData.error === false) {
       q.notify({ type: 'positive', message: 'File created' });
 
       if (rawFolderContent.value.id === parentId) {
         // Apply immediatly to the store
-        rawFolderContent.value.children.push(apiData.data as FileNode);
+        const tempNode = apiData.data as FileNode;
+        tempNode.selected = false;
+        rawFolderContent.value.children.push(tempNode);
       } else {
         // maybe do nothing, idk this is not used
         await refreshFolder();
@@ -349,7 +345,7 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
     itemId: string,
     passwordOptions: {
       isPasswordProtected: boolean;
-      sharedPassword: string;
+      password: string;
     },
   ) {
     const apiData = await apiPatch(`/files/nodes/${itemId}/`, passwordOptions, axiosConfig);
@@ -367,6 +363,15 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
   }
 
   // Utilities
+  function resetNewItem() {
+    newItem.value = {
+      show: false,
+      name: '',
+      type: '',
+      mime: 'text/code',
+    };
+  }
+
   function validName(name: string) {
     if (name.length < 1) {
       q.notify({
@@ -453,5 +458,6 @@ export const useFileOperationsStore = defineStore('fileOperations', () => {
     updateSharing,
     updateSharingPassword,
     validName,
+    resetNewItem,
   };
 });

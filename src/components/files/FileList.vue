@@ -10,271 +10,279 @@
     />
   </div>
 
-  <q-list v-else>
-    <q-item
-      class="full-width rounded-borders"
-      v-if="filesStore.fileOps.newItem.show"
-      style="background-color: rgba(60, 177, 60, 0.801)"
-    >
-      <q-item-section
-        avatar
-        top
+  <q-list
+    v-else
+    class="column col"
+  >
+    <q-scroll-area class="column col">
+      <q-item
+        class="full-width rounded-borders"
+        v-if="filesStore.fileOps.newItem.show"
+        style="background-color: rgba(60, 177, 60, 0.801)"
       >
-        <q-fab
-          v-if="filesStore.fileOps.newItem.type == 'folder'"
-          class="bg-layout-bg text-layout-text no-pointer-events"
-          icon="folder"
-          direction="down"
-          round
-          padding="sm"
-        />
-        <q-fab
-          v-else
-          class="bg-layout-bg text-layout-text"
-          :icon="getIcon(filesStore.fileOps.newItem.mime)"
-          direction="right"
-          round
-          padding="sm"
+        <q-item-section
+          avatar
+          top
         >
-          <template
-            v-for="[key, value] in Array.from(createTypes)"
-            :key="key"
+          <q-fab
+            v-if="filesStore.fileOps.newItem.type == 'folder'"
+            class="bg-layout-bg text-layout-text no-pointer-events"
+            icon="folder"
+            direction="down"
+            round
+            padding="sm"
+          />
+          <q-fab
+            v-else
+            class="bg-layout-bg text-layout-text"
+            :icon="getIcon(filesStore.fileOps.newItem.mime)"
+            direction="right"
+            round
+            padding="sm"
           >
-            <q-fab-action
-              class="bg-layout-bg text-layout-text"
-              @click="filesStore.fileOps.newItem.mime = key"
-              :icon="value.icon"
-              :label="value.name"
-            />
-          </template>
-        </q-fab>
-      </q-item-section>
-
-      <q-item-section>
-        <q-input
-          dark
-          outlined
-          dense
-          color="white"
-          v-model="filesStore.fileOps.newItem.name"
-          :label="`New ${filesStore.fileOps.newItem.type == 'folder' ? 'Folder' : 'File'} Name`"
-          class="text-body1 q-ml-md"
-          input-class="text-body2"
-          clearable
-          @keyup.enter="createNewItem"
-          ref="newItemInput"
-          hide-bottom-space
-          autofocus
-        />
-      </q-item-section>
-      <q-item-section side>
-        <div class="row">
-          <q-btn
-            icon="done"
-            class="q-ml-md bg-green text-white"
-            round
-            flat
-            @click="createNewItem"
-          />
-          <q-btn
-            icon="close"
-            class="q-ml-md bg-red text-white"
-            round
-            flat
-            @click="resetNewItem"
-          />
-        </div>
-      </q-item-section>
-    </q-item>
-    <template
-      v-for="(item, index) in filesStore.fileOps.rawFolderContent.children"
-      :key="item.id"
-    >
-      <!-- Folder items -->
-      <q-item
-        v-if="item.nodeType == 'folder'"
-        ref="folderRefs"
-        :id="index"
-        :data-id="item.id"
-        :data-type="item.nodeType"
-        clickable
-        @click="getFolderById(item.id)"
-        class="file-item selecto-target q-pa-none"
-        :class="[
-          item.dragOver ? 'dragover' : '',
-          item.selected ? 'selected' : '',
-          item.highlight ? 'highlight' : '',
-          isDropTarget(item.id) ? 'drop-target' : '',
-          isDragging(item.id) ? 'is-dragging' : '',
-        ]"
-        draggable="true"
-        @dragstart="handleDragStart($event, item)"
-        @dragend="handleDragEnd"
-        @dragover.prevent
-        @dragenter.prevent="handleDragEnter($event, item.id)"
-        @dragleave.prevent="handleDragLeave($event, item.id)"
-        @drop.prevent="handleDrop($event, item.id)"
-      >
-        <q-popup-proxy
-          context-menu
-          :breakpoint="0"
-          @before-show="item.highlight = true"
-          @before-hide="item.highlight = false"
-        >
-          <RightClickMenu :prop-item="item" />
-        </q-popup-proxy>
-
-        <div class="file-item-content full-height full-width flex-center no-pointer-events">
-          <!-- Checkbox -->
-          <div class="file-checkbox flex-center pointer-events">
-            <q-checkbox
-              :modelValue="item.selected"
-              dense
-              color="primary"
-              @update:modelValue="handleCheckboxClick(item)"
-              @click.stop
-            />
-          </div>
-
-          <!-- Icon -->
-          <div class="file-icon">
-            <q-icon
-              name="folder"
-              color="primary"
-              size="sm"
-            />
-          </div>
-
-          <!-- Filename -->
-          <div class="file-name">
-            <q-icon
-              name="share"
-              v-if="item.isShared"
-              size="xs"
-            />
-            {{ item.name }}
-          </div>
-
-          <!-- Size - hidden on small screens -->
-          <div class="file-size">-</div>
-
-          <!-- Modified date - hidden on smaller screens -->
-          <div class="file-date">
-            {{ item.modified }}
-          </div>
-
-          <!-- Actions -->
-          <div class="file-actions pointer-events">
-            <q-btn
-              icon="more_vert"
-              flat
-              round
-              dense
-              size="md"
-              color="primary"
-              :loading="localLoading"
-              @click.prevent.stop
+            <template
+              v-for="[key, value] in Array.from(createTypes)"
+              :key="key"
             >
-              <q-menu>
-                <RightClickMenu :prop-item="item" />
-              </q-menu>
-            </q-btn>
-          </div>
-        </div>
-      </q-item>
+              <q-fab-action
+                class="bg-layout-bg text-layout-text"
+                @click="filesStore.fileOps.newItem.mime = key"
+                :icon="value.icon"
+                :label="value.name"
+              />
+            </template>
+          </q-fab>
+        </q-item-section>
 
-      <!-- File items -->
-      <q-item
-        v-else
-        ref="fileRefs"
-        :id="index"
-        :data-id="item.id"
-        :data-type="item.nodeType"
-        clickable
-        draggable="true"
-        @dragstart="handleDragStart($event, item)"
-        @dragend="handleDragEnd"
-        class="file-item selecto-target q-pa-none"
-        :class="[
-          item.selected ? 'selected' : '',
-          item.highlight ? 'highlight' : '',
-          isDragging(item.id) ? 'is-dragging' : '',
-        ]"
-      >
-        <q-popup-proxy
-          context-menu
-          :breakpoint="0"
-          @before-show="item.highlight = true"
-          @before-hide="item.highlight = false"
-        >
-          <RightClickMenu :prop-item="item" />
-        </q-popup-proxy>
-
-        <div class="file-item-content full-height full-width flex-center no-pointer-events">
-          <!-- Checkbox -->
-          <div class="file-checkbox pointer-events">
-            <q-checkbox
-              :modelValue="item.selected"
-              dense
-              color="primary"
-              @update:modelValue="handleCheckboxClick(item)"
-              @click.stop
-              class="pointer-events"
-            />
-          </div>
-
-          <!-- Icon -->
-          <div class="file-icon">
-            <q-icon
-              :name="getIcon(item.mimeType)"
-              color="primary"
-              size="sm"
-            />
-          </div>
-
-          <!-- Filename -->
-          <div class="file-name">
-            <q-icon
-              name="share"
-              v-if="item.isShared"
-              size="xs"
-            />
-            {{ item.name }}
-          </div>
-
-          <!-- Size - hidden on small screens -->
-          <div class="file-size">
-            {{ item.displaySize }}
-          </div>
-
-          <!-- Modified date - hidden on smaller screens -->
-          <div class="file-date">
-            {{ item.modified }}
-          </div>
-
-          <!-- Actions -->
-          <div class="file-actions">
+        <q-item-section>
+          <q-input
+            dark
+            outlined
+            dense
+            color="white"
+            v-model="filesStore.fileOps.newItem.name"
+            :label="`New ${filesStore.fileOps.newItem.type == 'folder' ? 'Folder' : 'File'} Name`"
+            class="text-body1 q-ml-md"
+            input-class="text-body2"
+            clearable
+            @keyup.enter="createNewItem"
+            ref="newItemInput"
+            hide-bottom-space
+            autofocus
+          />
+        </q-item-section>
+        <q-item-section side>
+          <div class="row">
             <q-btn
-              icon="more_vert"
-              flat
+              icon="done"
+              class="q-ml-md bg-green text-white"
               round
-              dense
-              size="md"
-              class="pointer-events"
-              color="primary"
-              :loading="localLoading"
-              @click.prevent.stop
-            >
-              <q-menu>
-                <RightClickMenu :prop-item="item" />
-              </q-menu>
-            </q-btn>
+              flat
+              @click="createNewItem"
+            />
+            <q-btn
+              icon="close"
+              class="q-ml-md bg-red text-white"
+              round
+              flat
+              @click="filesStore.fileOps.resetNewItem"
+            />
           </div>
-        </div>
+        </q-item-section>
       </q-item>
+      <template
+        v-for="(item, index) in filesStore.filter.filteredAndSortedContent"
+        :key="item.id"
+      >
+        <!-- Folder items -->
+        <q-item
+          v-if="item.nodeType == 'folder'"
+          ref="folderRefs"
+          :id="index"
+          :data-id="item.id"
+          :data-type="item.nodeType"
+          clickable
+          @click="getFolderById(item.id)"
+          class="file-item selecto-target q-pa-none"
+          :class="[
+            item.dragOver ? 'dragover' : '',
+            item.selected ? 'selected' : '',
+            item.highlight ? 'highlight' : '',
+            isDropTarget(item.id) ? 'drop-target' : '',
+            isDragging(item.id) ? 'is-dragging' : '',
+          ]"
+          draggable="true"
+          @dragstart="handleDragStart($event, item)"
+          @dragend="handleDragEnd"
+          @dragover.prevent
+          @dragenter.prevent="handleDragEnter($event, item.id)"
+          @dragleave.prevent="handleDragLeave($event, item.id)"
+          @drop.prevent="handleDrop($event, item.id)"
+        >
+          <q-popup-proxy
+            context-menu
+            :breakpoint="0"
+            @before-show="item.highlight = true"
+            @before-hide="item.highlight = false"
+          >
+            <RightClickMenu :prop-item="item" />
+          </q-popup-proxy>
 
-      <q-separator class="q-ma-none" />
-    </template>
+          <div class="file-item-content full-height full-width flex-center no-pointer-events">
+            <!-- Checkbox -->
+            <div class="file-checkbox flex-center pointer-events">
+              <q-checkbox
+                :modelValue="item.selected"
+                dense
+                color="primary"
+                @update:modelValue="handleCheckboxClick(item)"
+                @click.stop
+              />
+            </div>
+
+            <!-- Icon -->
+            <div class="file-icon">
+              <q-icon
+                name="folder"
+                color="primary"
+                size="sm"
+              />
+            </div>
+
+            <!-- Filename -->
+            <div class="file-name">
+              <q-icon
+                name="share"
+                v-if="item.isShared"
+                size="xs"
+              />
+              {{ item.name }}
+            </div>
+
+            <!-- Size - hidden on small screens -->
+            <div class="file-size">-</div>
+
+            <!-- Modified date - hidden on smaller screens -->
+            <div class="file-date">
+              {{ item.modified }}
+            </div>
+
+            <!-- Actions -->
+            <div class="file-actions pointer-events">
+              <q-btn
+                icon="more_vert"
+                flat
+                round
+                dense
+                size="md"
+                color="primary"
+                :loading="localLoading"
+                @click.prevent.stop
+              >
+                <q-menu>
+                  <RightClickMenu :prop-item="item" />
+                </q-menu>
+              </q-btn>
+            </div>
+          </div>
+        </q-item>
+
+        <!-- File items -->
+        <q-item
+          v-else
+          ref="fileRefs"
+          :id="index"
+          :data-id="item.id"
+          :data-type="item.nodeType"
+          clickable
+          draggable="true"
+          @dragstart="handleDragStart($event, item)"
+          @dragend="handleDragEnd"
+          @click="filesStore.preview.showPreview(item)"
+          class="file-item selecto-target q-pa-none"
+          :class="[
+            item.selected ? 'selected' : '',
+            item.highlight ? 'highlight' : '',
+            isDragging(item.id) ? 'is-dragging' : '',
+          ]"
+        >
+          <q-popup-proxy
+            context-menu
+            :breakpoint="0"
+            @before-show="item.highlight = true"
+            @before-hide="item.highlight = false"
+          >
+            <RightClickMenu :prop-item="item" />
+          </q-popup-proxy>
+
+          <div class="file-item-content full-height full-width flex-center no-pointer-events">
+            <!-- Checkbox -->
+            <div class="file-checkbox pointer-events">
+              <q-checkbox
+                :modelValue="item.selected"
+                dense
+                color="primary"
+                @update:modelValue="handleCheckboxClick(item)"
+                @click.stop
+                class="pointer-events"
+              />
+            </div>
+
+            <!-- Icon -->
+            <div class="file-icon">
+              <q-icon
+                :name="getIcon(item.mimeType)"
+                color="primary"
+                size="sm"
+              />
+            </div>
+
+            <!-- Filename -->
+            <div class="file-name">
+              <q-icon
+                name="share"
+                v-if="item.isShared"
+                size="xs"
+              />
+              {{ item.name }}
+            </div>
+
+            <!-- Size - hidden on small screens -->
+            <div class="file-size">
+              {{ item.displaySize }}
+            </div>
+
+            <!-- Modified date - hidden on smaller screens -->
+            <div class="file-date">
+              {{ item.modified }}
+            </div>
+
+            <!-- Actions -->
+            <div class="file-actions">
+              <q-btn
+                icon="more_vert"
+                flat
+                round
+                dense
+                size="md"
+                class="pointer-events"
+                color="primary"
+                :loading="localLoading"
+                @click.prevent.stop
+              >
+                <q-menu>
+                  <RightClickMenu :prop-item="item" />
+                </q-menu>
+              </q-btn>
+            </div>
+          </div>
+        </q-item>
+
+        <q-separator class="q-ma-none" />
+      </template>
+      <!-- Some space at the bottom of the list -->
+      <div style="height: 50px" />
+    </q-scroll-area>
   </q-list>
 </template>
 
@@ -538,16 +546,9 @@ async function createNewItem(): Promise<void> {
   }
 
   if (creation.successful) {
-    resetNewItem();
+    filesStore.fileOps.resetNewItem();
   }
   localLoading.value = false;
-}
-
-function resetNewItem(): void {
-  filesStore.fileOps.newItem.show = false;
-  filesStore.fileOps.newItem.name = '';
-  filesStore.fileOps.newItem.type = 'text/code';
-  filesStore.fileOps.newItem.mime = '';
 }
 
 // Initialize on mount

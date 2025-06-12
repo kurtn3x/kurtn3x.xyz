@@ -1,7 +1,7 @@
 <template>
   <div
     class="absolute-full flex flex-center bg-transparent"
-    v-if="loading"
+    v-if="filePreviewStore.loading"
   >
     <q-spinner
       color="primary"
@@ -9,14 +9,14 @@
     />
   </div>
   <div
-    v-if="!loading && error"
+    v-if="!filePreviewStore.loading && filePreviewStore.error"
     class="row justify-center q-mt-lg text-red text-h6"
   >
-    Couldn't load Text from File.
+    {{ filePreviewStore.errorMessage }}
   </div>
 
   <div
-    v-if="!loading && !error"
+    v-if="!filePreviewStore.loading && !filePreviewStore.error"
     class="col column"
   >
     <div
@@ -30,7 +30,12 @@
           flat
           stretch
           class="bg-green text-white"
-          @click="updateContent"
+          @click="
+            filePreviewStore.updateFileContent(
+              filePreviewStore.activeFile.id,
+              filePreviewStore.activeFileContent,
+            )
+          "
           v-if="localStore.isAuthenticated"
         />
         <q-separator
@@ -46,15 +51,15 @@
           color="white"
         />
         <q-btn
-          :icon="isDarkMode ? 'dark_mode' : 'light_mode'"
+          :icon="localStore.isDarkMode ? 'dark_mode' : 'light_mode'"
           flat
-          @click="isDarkMode = !isDarkMode"
+          @click="localStore.toggleDarkMode()"
         />
       </div>
     </div>
 
     <q-editor
-      v-model="text"
+      v-model="filePreviewStore.activeFileContent"
       :toolbar="[
         ['bold', 'italic', 'strike', 'underline'],
         ['token', 'hr', 'link', 'custom_btn'],
@@ -113,103 +118,24 @@
         times_new_roman: 'Times New Roman',
         verdana: 'Verdana',
       }"
-      :dark="isDarkMode"
-      :class="isDarkMode ? 'text-white' : 'text-dark'"
+      :dark="localStore.isDarkMode"
+      :class="localStore.isDarkMode ? 'text-white' : 'text-dark'"
       class="col column"
       max-height="600px"
-      @keydown.ctrl.s.prevent.stop="updateContent"
+      @keydown.ctrl.s.prevent.stop="
+        filePreviewStore.updateFileContent(
+          filePreviewStore.activeFile.id,
+          filePreviewStore.activeFileContent,
+        )
+      "
     />
   </div>
 </template>
 
-<script setup>
-import { computed, defineProps, ref, watch } from 'vue';
-import { useQuasar } from 'quasar';
-import { apiGet, apiPut } from 'src/api/apiWrapper';
-import { useLocalStore } from 'stores/localStore';
+<script setup lang="ts">
+import { useFilePreviewStore } from 'src/stores/fileStores/filePreviewStore';
+import { useLocalStore } from 'src/stores/localStore';
 
-const props = defineProps({
-  item: Object,
-  password: {
-    type: String,
-    default: '',
-  },
-});
-const item = computed(() => props.item);
-
-const q = useQuasar();
+const filePreviewStore = useFilePreviewStore();
 const localStore = useLocalStore();
-var loading = ref(true);
-var error = ref(false);
-const axiosConfig = {
-  withCredentials: true,
-  headers: {
-    'X-CSRFToken': q.cookies.get('csrftoken'),
-  },
-};
-var isDarkMode = ref(localStore.isDarkMode);
-var text = ref('');
-getFileContent();
-
-watch(
-  () => props.item,
-  (newVal) => {
-    getFileContent();
-  },
-  { immediate: true },
-);
-
-function getFileContent() {
-  var args = '';
-  if (props.password != '') {
-    args += '?password=' + props.password;
-  }
-  apiGet('/files/file-content/' + item.value.id + args, axiosConfig).then((apiData) => {
-    if (apiData.error == false) {
-      text.value = apiData.data.content;
-      loading.value = false;
-      error.value = false;
-    } else {
-      loading.value = false;
-      error.value = true;
-    }
-  });
-}
-function updateContent() {
-  if (!localStore.isAuthenticated) {
-    return;
-  }
-  var data = {
-    content: text.value,
-  };
-  apiPut('/files/file-content/' + item.value.id, data, axiosConfig).then((apiData) => {
-    if (apiData.error == false) {
-      q.notify({
-        type: 'positive',
-        message: 'Saved.',
-        progress: true,
-      });
-      apiGet('/files/file-content/' + item.value.id + '?only_size=1', axiosConfig).then(
-        (apiData) => {
-          if (apiData.error == false) {
-            item.value.size = apiData.data.size;
-            item.value.sizeBytes = apiData.data.sizeBytes;
-          } else {
-            q.notify({
-              type: 'negative',
-              message: apiData.errorMessage,
-              progress: true,
-            });
-          }
-        },
-      );
-    } else {
-      q.notify({
-        type: 'negative',
-        message: apiData.errorMessage,
-        progress: true,
-      });
-    }
-  });
-}
 </script>

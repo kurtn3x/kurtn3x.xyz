@@ -42,10 +42,10 @@ const routes: RouteRecordRaw[] = [
     path: '/files',
     component: () => import('src/layouts/MainLayout.vue'),
     children: [
-      //{
-      //  path: 'file/:id',
-      //  component: () => import('src/pages/public/files/SharedFileView.vue'),
-      // },
+      {
+        path: 'file/:id',
+        component: () => import('src/pages/public/files/SharedFileView.vue'),
+      },
       //{
       //  path: 'sl/:id',
       //  component: () => import('src/pages/public/files/ShortLinkView.vue'),
@@ -71,6 +71,10 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'files',
         component: () => import('src/pages/authenticated/FilesView.vue'),
+      },
+      {
+        path: 'upload',
+        component: () => import('src/pages/UploadTest.vue'),
       },
       {
         path: 'vpn',

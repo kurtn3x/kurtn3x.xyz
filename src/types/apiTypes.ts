@@ -194,6 +194,13 @@ export type UploadChunk = {
   createdAt: string;
 };
 
+export type FileContent = {
+  id: string; // File ID
+  content: string | null; // Base64 encoded content for binary files, text for text files
+  displaySize: string; // Human-readable size (e.g., "2.5 MB")
+  sizeBytes: number; // Size in bytes
+};
+
 ///////////////////////////////////////////
 
 export type AuthResponse = {

@@ -1,564 +1,249 @@
+<!-- filepath: /home/kurtn3x/main/kurtn3x.xyz/src/components/files/UploadWindow.vue -->
 <template>
-  <q-card
-    class="upload-window"
-    bordered
+  <q-page-sticky
+    v-if="uploadStore.showProgressDialog && !localStore.isSmallWidth"
+    position="bottom-right"
   >
-    <!-- Header -->
-    <q-card-section class="q-pa-sm bg-primary text-white">
-      <div class="row items-center justify-between">
-        <div class="text-h6 row items-center">
+    <q-card
+      bordered
+      style="width: 350px"
+    >
+      <q-card-section class="q-pa-none row">
+        <div class="q-pa-sm">
           <q-icon
             name="cloud_upload"
-            class="q-mr-sm"
-          />
-          Upload Manager
-          <q-badge
-            v-if="uploadStore.hasActiveUploads"
-            color="orange"
+            size="sm"
             class="q-ml-sm"
-          >
-            {{ activeUploadsCount }}
-          </q-badge>
+          />
+          <a class="q-ml-md ellipsis text-h6">Upload Manager</a>
         </div>
+        <q-space />
+        <q-btn
+          flat
+          stretch
+          size="sm"
+          :icon="minimized ? 'expand_less' : 'expand_more'"
+          @click="minimized = !minimized"
+        />
 
-        <div class="row q-gutter-xs">
-          <!-- Overall progress -->
-          <q-circular-progress
-            v-if="uploadStore.hasActiveUploads"
-            :value="uploadStore.totalUploadProgress"
-            size="30px"
-            :thickness="0.3"
-            color="white"
-            track-color="rgba(255,255,255,0.3)"
-            class="q-mr-sm"
-          />
-
-          <!-- Toggle minimize -->
-          <q-btn
-            @click="minimized = !minimized"
-            :icon="minimized ? 'expand_less' : 'expand_more'"
-            size="sm"
-            flat
-            round
-            dense
-          />
-
-          <!-- Close button -->
-          <q-btn
-            @click="closeWindow"
-            icon="close"
-            size="sm"
-            flat
-            round
-            dense
-          />
-        </div>
-      </div>
-
-      <!-- Overall progress bar when minimized -->
+        <q-btn
+          size="sm"
+          flat
+          stretch
+          icon="close"
+          @click="uploadStore.toogleProgressDialog()"
+          class="close"
+        />
+      </q-card-section>
       <div
         v-if="minimized && uploadStore.hasActiveUploads"
         class="q-mt-sm"
       >
         <q-linear-progress
-          :value="uploadStore.totalUploadProgress"
+          :value="uploadStore.totalUploadProgress / 100"
           color="white"
           track-color="rgba(255,255,255,0.3)"
           size="4px"
           rounded
         />
         <div class="text-caption q-mt-xs">
-          {{ Math.round(uploadStore.totalUploadProgress * 100) }}% • {{ activeUploadsCount }} active
-          uploads
+          {{ Math.round(uploadStore.totalUploadProgress) }}% • {{ activeCount }} active •
+          {{ totalCount }} total
         </div>
       </div>
-    </q-card-section>
 
-    <!-- Upload content (hidden when minimized) -->
-    <div v-if="!minimized">
-      <!-- Upload Statistics -->
-      <q-card-section class="q-pa-sm bg-grey-1">
-        <div class="row q-gutter-md text-center">
-          <div class="col">
-            <div class="text-h6 text-primary">
-              {{ uploadStats.queued }}
-            </div>
-            <div class="text-caption">Queued</div>
-          </div>
-          <div class="col">
-            <div class="text-h6 text-orange">
-              {{ uploadStats.active }}
-            </div>
-            <div class="text-caption">Active</div>
-          </div>
-          <div class="col">
-            <div class="text-h6 text-green">{{ uploadStats.completed }}</div>
-            <div class="text-caption">Completed</div>
-          </div>
-          <div class="col">
-            <div class="text-h6 text-red">{{ uploadStats.failed }}</div>
-            <div class="text-caption">Failed</div>
-          </div>
+      <!-- Upload content -->
+      <div v-if="!minimized">
+        <!-- Upload List Component -->
+        <q-separator :color="localStore.isDarkMode ? 'white' : 'dark'" />
+        <div style="max-height: 200px; overflow-y: auto">
+          <UploadList
+            :uploads="allUploads"
+            @cancel="handleCancel"
+            @retry="handleRetry"
+            @remove="handleRemove"
+          />
         </div>
+
+        <!-- Actions -->
+
+        <q-card-actions
+          v-if="allUploads.length > 0"
+          align="right"
+          class="q-pa-sm"
+        >
+          <q-space />
+          <q-btn
+            v-if="completedCount + failedCount > 0"
+            @click="clearCompleted"
+            label="Clear Completed"
+            size="sm"
+            flat
+            class="bg-green text-white"
+          />
+          <q-btn
+            v-if="activeCount > 0"
+            @click="cancelAllActive"
+            label="Cancel All Active"
+            size="sm"
+            flat
+            class="bg-red text-white"
+          />
+
+          <q-btn
+            @click="clearAll"
+            label="Clear All"
+            size="sm"
+            flat
+            class="bg-grey text-white"
+          />
+        </q-card-actions>
+      </div>
+    </q-card>
+  </q-page-sticky>
+  <q-dialog
+    :model-value="uploadStore.showProgressDialog"
+    v-if="localStore.isSmallWidth"
+    maximized
+  >
+    <q-card
+      bordered
+      class="column"
+    >
+      <q-card-section class="q-pa-none row">
+        <div class="q-pa-sm">
+          <q-icon
+            name="cloud_upload"
+            size="sm"
+            class="q-ml-sm"
+          />
+          <a class="q-ml-md ellipsis text-h6">Upload Manager</a>
+        </div>
+        <q-space />
+
+        <q-btn
+          size="sm"
+          flat
+          stretch
+          icon="close"
+          @click="uploadStore.toogleProgressDialog()"
+          class="close"
+        />
       </q-card-section>
 
-      <q-separator />
+      <!-- Upload content -->
+      <!-- Upload List Component -->
+      <q-separator :color="localStore.isDarkMode ? 'white' : 'dark'" />
+      <div class="col column">
+        <div class="col overflow-auto">
+          <UploadList
+            :uploads="allUploads"
+            @cancel="handleCancel"
+            @retry="handleRetry"
+            @remove="handleRemove"
+          />
+        </div>
 
-      <!-- Tabs for different upload states -->
-      <q-tabs
-        v-model="activeTab"
-        align="justify"
-        class="text-grey"
-        active-color="primary"
-        indicator-color="primary"
-        narrow-indicator
-      >
-        <q-tab
-          name="active"
-          label="Active Uploads"
-          :badge="activeAndPreparingUploads.length || undefined"
-        />
-        <q-tab
-          name="queue"
-          label="Upload Queue"
-          :badge="uploadStore.queuedUploads.length || undefined"
-        />
-        <q-tab
-          name="completed"
-          label="Completed"
-          :badge="completedAndFailedUploads.length || undefined"
-        />
-      </q-tabs>
+        <!-- Actions -->
 
-      <q-separator />
-
-      <!-- Tab Panels -->
-      <q-tab-panels
-        v-model="activeTab"
-        style="max-height: 400px; overflow: auto"
-      >
-        <!-- Active Uploads -->
-        <q-tab-panel
-          name="active"
-          class="q-pa-none"
+        <q-card-actions
+          v-if="allUploads.length > 0"
+          align="right"
+          class="q-pa-sm"
         >
-          <div
-            v-if="activeAndPreparingUploads.length === 0"
-            class="text-center q-pa-md text-grey"
-          >
-            No active uploads
-          </div>
+          <q-separator :color="localStore.isDarkMode ? 'white' : 'dark'" />
+          <q-space />
+          <q-btn
+            v-if="completedCount + failedCount > 0"
+            @click="clearCompleted"
+            label="Clear Completed"
+            size="sm"
+            flat
+            class="bg-green text-white"
+          />
+          <q-btn
+            v-if="activeCount > 0"
+            @click="cancelAllActive"
+            label="Cancel All Active"
+            size="sm"
+            flat
+            class="bg-red text-white"
+          />
 
-          <q-list
-            v-else
-            separator
-          >
-            <q-item
-              v-for="upload in activeAndPreparingUploads"
-              :key="`active-${upload.id}`"
-              dense
-            >
-              <q-item-section avatar>
-                <q-avatar
-                  :color="getUploadColor(upload.status)"
-                  text-color="white"
-                  size="sm"
-                >
-                  <q-icon :name="getUploadIcon(upload.status)" />
-                </q-avatar>
-              </q-item-section>
-
-              <q-item-section>
-                <q-item-label class="ellipsis">
-                  {{ upload.name }}
-                  <span
-                    v-if="upload.sizeBytes >= uploadStore.CHUNKED_UPLOAD_THRESHOLD"
-                    class="text-orange q-ml-sm text-caption"
-                  >
-                    (Chunked)
-                  </span>
-                </q-item-label>
-
-                <!-- Progress bar -->
-                <q-linear-progress
-                  :value="getUploadProgress(upload)"
-                  :color="getUploadColor(upload.status)"
-                  class="q-mt-xs"
-                  rounded
-                  size="4px"
-                />
-
-                <!-- Status and size info -->
-                <q-item-label
-                  caption
-                  class="row items-center justify-between"
-                >
-                  <span>{{ formatUploadProgress(upload) }}</span>
-                  <span>{{ Math.round(getUploadProgress(upload) * 100) }}%</span>
-                </q-item-label>
-
-                <!-- Upload speed -->
-                <q-item-label
-                  v-if="upload.uploadSpeed > 0"
-                  caption
-                  class="text-blue"
-                >
-                  {{ formatSpeed(upload.uploadSpeed) }}
-                </q-item-label>
-
-                <!-- Error message -->
-                <q-item-label
-                  v-if="upload.status === UploadStatus.FAILED && upload.message"
-                  caption
-                  class="text-red"
-                >
-                  {{ upload.message }}
-                </q-item-label>
-              </q-item-section>
-
-              <q-item-section side>
-                <q-btn
-                  v-if="[UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(upload.status)"
-                  @click="uploadStore.cancelUpload(upload.id)"
-                  icon="close"
-                  size="xs"
-                  round
-                  flat
-                  dense
-                  color="negative"
-                >
-                  <q-tooltip>Cancel</q-tooltip>
-                </q-btn>
-              </q-item-section>
-            </q-item>
-          </q-list>
-
-          <!-- Actions for active uploads -->
-          <q-card-actions
-            v-if="activeAndPreparingUploads.length > 0"
-            align="right"
-            class="q-pa-sm"
-          >
-            <q-btn
-              @click="cancelAllActiveUploads"
-              label="Cancel All"
-              size="sm"
-              flat
-              color="negative"
-            />
-          </q-card-actions>
-        </q-tab-panel>
-
-        <!-- Upload Queue -->
-        <q-tab-panel
-          name="queue"
-          class="q-pa-none"
-        >
-          <div
-            v-if="uploadStore.queuedUploads.length === 0"
-            class="text-center q-pa-md text-grey"
-          >
-            No files in upload queue
-          </div>
-
-          <q-list
-            v-else
-            separator
-          >
-            <q-item
-              v-for="upload in uploadStore.queuedUploads"
-              :key="`queue-${upload.id}`"
-              dense
-            >
-              <q-item-section avatar>
-                <q-icon
-                  name="schedule"
-                  color="info"
-                />
-              </q-item-section>
-
-              <q-item-section>
-                <q-item-label class="ellipsis">
-                  {{ upload.name }}
-                  <span
-                    v-if="upload.sizeBytes >= uploadStore.CHUNKED_UPLOAD_THRESHOLD"
-                    class="text-orange q-ml-sm text-caption"
-                  >
-                    (Chunked Upload)
-                  </span>
-                </q-item-label>
-                <q-item-label caption>
-                  {{ fileSizeDecimal(upload.sizeBytes) }}
-                </q-item-label>
-              </q-item-section>
-
-              <q-item-section side>
-                <q-btn
-                  @click="uploadStore.cancelUpload(upload.id)"
-                  icon="close"
-                  size="xs"
-                  round
-                  flat
-                  dense
-                  color="negative"
-                >
-                  <q-tooltip>Remove</q-tooltip>
-                </q-btn>
-              </q-item-section>
-            </q-item>
-          </q-list>
-
-          <!-- Actions for upload queue -->
-          <q-card-actions
-            v-if="uploadStore.queuedUploads.length > 0"
-            align="right"
-            class="q-pa-sm"
-          >
-            <q-btn
-              @click="clearQueuedUploads"
-              label="Clear Queue"
-              size="sm"
-              flat
-              color="negative"
-            />
-          </q-card-actions>
-        </q-tab-panel>
-
-        <!-- Completed & Failed Uploads -->
-        <q-tab-panel
-          name="completed"
-          class="q-pa-none"
-        >
-          <div
-            v-if="completedAndFailedUploads.length === 0"
-            class="text-center q-pa-md text-grey"
-          >
-            No completed uploads
-          </div>
-
-          <q-list
-            v-else
-            separator
-          >
-            <q-item
-              v-for="upload in completedAndFailedUploads"
-              :key="`completed-${upload.id}`"
-              dense
-            >
-              <q-item-section avatar>
-                <q-avatar
-                  :color="getUploadColor(upload.status)"
-                  text-color="white"
-                  size="sm"
-                >
-                  <q-icon :name="getUploadIcon(upload.status)" />
-                </q-avatar>
-              </q-item-section>
-
-              <q-item-section>
-                <q-item-label class="ellipsis">
-                  {{ upload.name }}
-                  <span
-                    v-if="upload.sizeBytes >= uploadStore.CHUNKED_UPLOAD_THRESHOLD"
-                    class="text-orange q-ml-sm text-caption"
-                  >
-                    (Chunked)
-                  </span>
-                </q-item-label>
-
-                <q-item-label caption>
-                  {{ fileSizeDecimal(upload.sizeBytes) }} • {{ upload.status }}
-                </q-item-label>
-
-                <!-- Error message -->
-                <q-item-label
-                  v-if="upload.status === UploadStatus.FAILED && upload.message"
-                  caption
-                  class="text-red"
-                >
-                  {{ upload.message }}
-                </q-item-label>
-              </q-item-section>
-
-              <q-item-section side>
-                <div class="row q-gutter-xs">
-                  <!-- Retry button for failed uploads -->
-                  <q-btn
-                    v-if="upload.status === UploadStatus.FAILED && isChunkedUpload(upload)"
-                    @click="uploadStore.retryUpload(upload.id)"
-                    icon="refresh"
-                    size="xs"
-                    round
-                    flat
-                    dense
-                    color="primary"
-                  >
-                    <q-tooltip>Retry</q-tooltip>
-                  </q-btn>
-
-                  <!-- Remove button -->
-                  <q-btn
-                    @click="removeUpload(upload.id)"
-                    icon="delete"
-                    size="xs"
-                    round
-                    flat
-                    dense
-                    color="negative"
-                  >
-                    <q-tooltip>Remove</q-tooltip>
-                  </q-btn>
-                </div>
-              </q-item-section>
-            </q-item>
-          </q-list>
-
-          <!-- Actions for completed uploads -->
-          <q-card-actions
-            v-if="completedAndFailedUploads.length > 0"
-            align="right"
-            class="q-pa-sm"
-          >
-            <q-btn
-              @click="uploadStore.clearCompletedUploads()"
-              label="Clear Completed"
-              size="sm"
-              flat
-              color="primary"
-            />
-            <q-btn
-              @click="clearAllCompletedAndFailed"
-              label="Clear All"
-              size="sm"
-              flat
-              color="negative"
-            />
-          </q-card-actions>
-        </q-tab-panel>
-      </q-tab-panels>
-    </div>
-  </q-card>
+          <q-btn
+            @click="clearAll"
+            label="Clear All"
+            size="sm"
+            flat
+            class="bg-grey text-white"
+          />
+        </q-card-actions>
+      </div>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useUploadStore } from 'src/stores/fileStores/uploadStore';
-import { fileSizeDecimal } from 'src/components/lib/functions';
-import type { ChunkedUploadProgressEntry, RegularUploadProgressEntry } from 'src/types/localTypes';
-import { UploadStatus, isChunkedUpload } from 'src/types/localTypes';
+import { useLocalStore } from 'src/stores/localStore';
+import { uploadTypeUtils } from 'src/components/files/upload/helpers/uploadStatus';
+import UploadList from './upload/UploadList.vue';
+import type { AnyUploadProgressEntry } from 'src/types/localTypes';
+import { UploadStatus } from 'src/types/localTypes';
 
 // Store
 const uploadStore = useUploadStore();
+const localStore = useLocalStore();
 
 // Local state
 const minimized = ref(false);
-const activeTab = ref('active');
 
 // Computed properties
-const uploadStats = computed(() => uploadStore.getUploadStats());
+const allUploads = computed(() => [...uploadStore.uploadQueue, ...uploadStore.uploadProgressList]);
 
-const activeUploadsCount = computed(() => uploadStats.value.active);
-
-const activeAndPreparingUploads = computed(() =>
-  uploadStore.uploadProgressList.filter((upload) =>
-    [UploadStatus.UPLOADING, UploadStatus.PREPARING].includes(upload.status),
-  ),
+const activeCount = computed(
+  () => allUploads.value.filter((u) => uploadTypeUtils.isActive(u)).length,
 );
 
-const completedAndFailedUploads = computed(() =>
-  uploadStore.uploadProgressList.filter((upload) =>
-    [UploadStatus.COMPLETED, UploadStatus.FAILED, UploadStatus.CANCELED].includes(upload.status),
-  ),
+const completedCount = computed(
+  () => allUploads.value.filter((u) => u.status === UploadStatus.COMPLETED).length,
 );
 
-// Methods
-function closeWindow() {
-  if (uploadStore.hasActiveUploads) {
-    minimized.value = true;
-  } else {
-    uploadStore.showProgressDialog = false;
-  }
+const failedCount = computed(
+  () => allUploads.value.filter((u) => u.status === UploadStatus.FAILED).length,
+);
+
+const totalCount = computed(() => allUploads.value.length);
+
+// Action handlers (simplified - just pass through to store)
+async function handleCancel(upload: AnyUploadProgressEntry): Promise<void> {
+  await uploadStore.cancelUpload(upload.id);
 }
 
-function getUploadIcon(status: UploadStatus): string {
-  switch (status) {
-    case UploadStatus.UPLOADING:
-      return 'cloud_upload';
-    case UploadStatus.COMPLETED:
-      return 'check_circle';
-    case UploadStatus.FAILED:
-      return 'error';
-    case UploadStatus.PREPARING:
-      return 'hourglass_empty';
-    case UploadStatus.QUEUED:
-      return 'schedule';
-    case UploadStatus.CANCELED:
-      return 'cancel';
-    default:
-      return 'help';
-  }
+async function handleRetry(upload: AnyUploadProgressEntry): Promise<void> {
+  await uploadStore.retryUpload(upload.id);
 }
 
-function getUploadColor(status: UploadStatus): string {
-  switch (status) {
-    case UploadStatus.UPLOADING:
-      return 'primary';
-    case UploadStatus.COMPLETED:
-      return 'positive';
-    case UploadStatus.FAILED:
-      return 'negative';
-    case UploadStatus.PREPARING:
-      return 'grey';
-    case UploadStatus.QUEUED:
-      return 'info';
-    case UploadStatus.CANCELED:
-      return 'grey';
-    default:
-      return 'grey';
-  }
+function handleRemove(upload: AnyUploadProgressEntry): void {
+  uploadStore.removeUploadById(upload.id);
 }
 
-function getUploadProgress(
-  upload: RegularUploadProgressEntry | ChunkedUploadProgressEntry,
-): number {
-  if (upload.sizeBytes === 0) return 0;
-  return upload.uploadedBytes / upload.sizeBytes;
+// Bulk actions
+async function cancelAllActive(): Promise<void> {
+  const activeUploads = allUploads.value.filter(uploadTypeUtils.isActive);
+  await Promise.all(activeUploads.map((upload) => uploadStore.cancelUpload(upload.id)));
 }
 
-function formatUploadProgress(
-  upload: RegularUploadProgressEntry | ChunkedUploadProgressEntry,
-): string {
-  const uploaded = fileSizeDecimal(upload.uploadedBytes);
-  const total = fileSizeDecimal(upload.sizeBytes);
-  return `${uploaded} / ${total}`;
+function clearCompleted(): void {
+  const completedUploads = allUploads.value.filter((u) =>
+    [UploadStatus.COMPLETED, UploadStatus.FAILED, UploadStatus.CANCELED].includes(u.status),
+  );
+  completedUploads.forEach((upload) => uploadStore.removeUploadById(upload.id));
 }
 
-function formatSpeed(bytesPerSecond: number): string {
-  return `${fileSizeDecimal(bytesPerSecond)}/s`;
-}
-
-function cancelAllActiveUploads(): void {
-  activeAndPreparingUploads.value.forEach((upload) => {
-    uploadStore.cancelUpload(upload.id);
-  });
-}
-
-function clearQueuedUploads(): void {
-  uploadStore.queuedUploads.forEach((upload) => {
-    uploadStore.cancelUpload(upload.id);
-  });
-}
-
-function clearAllCompletedAndFailed(): void {
-  const toRemove = completedAndFailedUploads.value.map((upload) => upload.id);
-  toRemove.forEach((id) => removeUpload(id));
-}
-
-function removeUpload(uploadId: string): void {
-  const index = uploadStore.uploadProgressList.findIndex((upload) => upload.id === uploadId);
-  if (index !== -1) {
-    uploadStore.uploadProgressList.splice(index, 1);
-  }
+async function clearAll(): Promise<void> {
+  await uploadStore.clearAllUploads();
 }
 </script>
 
@@ -567,11 +252,15 @@ function removeUpload(uploadId: string): void {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 450px;
+  width: 350px;
   max-width: 90vw;
   max-height: 80vh;
   z-index: 1000;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.close:hover {
+  background-color: rgba(255, 0, 0, 0.644);
 }
 
 @media (max-width: 600px) {
@@ -580,11 +269,5 @@ function removeUpload(uploadId: string): void {
     right: 2.5vw;
     bottom: 10px;
   }
-}
-
-.ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>

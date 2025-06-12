@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useQuasar } from 'quasar';
 import { useLocalStore } from 'stores/localStore';
@@ -34,6 +34,12 @@ export function useUserProfile() {
     state.error = false;
 
     const userParam = route.params.username;
+    if (!userParam) {
+      state.error = true;
+      state.errorMessage = 'No username provided';
+      state.loading = false;
+      return;
+    }
 
     if (localStore.isDebugMode) {
       q.notify({ type: 'info', message: 'Debug' });
@@ -44,7 +50,10 @@ export function useUserProfile() {
       return;
     }
 
-    const apiData = await apiGet(`/profile/profiles/by-username/${!userParam}/`, axiosConfig);
+    const apiData = await apiGet(
+      `/profile/profiles/by-username/${userParam as string}/`,
+      axiosConfig,
+    );
 
     if (apiData.error === false) {
       user.value = apiData.data as UserProfile;
@@ -57,6 +66,16 @@ export function useUserProfile() {
 
     state.loading = false;
   };
+
+  watch(
+    () => route.params.username,
+    async (newUsername, oldUsername) => {
+      if (newUsername && newUsername !== oldUsername) {
+        await getUser();
+      }
+    },
+    { immediate: true },
+  );
 
   return {
     state,

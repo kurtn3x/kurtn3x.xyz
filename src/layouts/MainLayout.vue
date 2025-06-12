@@ -1,30 +1,17 @@
 <template>
   <q-layout view="hHh LpR fff">
     <!-- Debug Panel (only in development) -->
-    <div
-      v-if="nodeEnv === 'development'"
-      style="position: fixed; bottom: 10px; right: 10px; z-index: 9999"
-    >
-      <q-btn round color="red" icon="bug_report" size="md">
-        <q-menu>
-          <q-list style="min-width: 200px">
-            <q-item>
-              <q-item-section>
-                <q-toggle v-model="debugMode" label="DEBUG" color="primary" />
-              </q-item-section>
-            </q-item>
-            <q-separator />
-            <q-item clickable v-close-popup @click="resetLocalStorage">
-              <q-item-section>Reset LocalStorage</q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </q-btn>
-    </div>
 
-    <q-header reveal height-hint="98" class="bg-layout-bg text-layout-text">
+    <q-header
+      reveal
+      height-hint="98"
+      class="bg-layout-bg text-layout-text"
+    >
       <!-- Authenticated Header -->
-      <q-toolbar class="q-pa-none" v-if="localStore.isAuthenticated">
+      <q-toolbar
+        class="q-pa-none"
+        v-if="localStore.isAuthenticated"
+      >
         <q-btn
           flat
           stretch
@@ -37,24 +24,79 @@
           "
           style="width: 57px"
         />
+
+        <q-btn
+          round
+          v-if="nodeEnv === 'development'"
+          color="red"
+          icon="bug_report"
+          size="md"
+        >
+          <q-menu>
+            <q-list style="min-width: 200px">
+              <q-item>
+                <q-item-section>
+                  <q-toggle
+                    v-model="debugMode"
+                    label="DEBUG"
+                    color="primary"
+                  />
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                clickable
+                v-close-popup
+                @click="resetLocalStorage"
+              >
+                <q-item-section>Reset LocalStorage</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
         <q-space />
 
-        <q-btn stretch flat class="button_hover">
-          <q-avatar class="q-mr-sm" size="26px" rounded>
+        <q-btn
+          stretch
+          flat
+          class="button_hover"
+        >
+          <q-avatar
+            class="q-mr-sm"
+            size="26px"
+            rounded
+          >
             <img :src="localStore.headerInfo.avatarUrl" />
           </q-avatar>
           <a class="text-body2 q-mr-sm text-weight-bold">
             {{ localStore.headerInfo.username }}
           </a>
-          <q-icon name="arrow_drop_down" size="sm" />
+          <q-icon
+            name="arrow_drop_down"
+            size="sm"
+          />
           <UserMenu :headerInfo="localStore.headerInfo" />
         </q-btn>
       </q-toolbar>
 
       <!-- Public Header -->
-      <q-toolbar class="q-pa-none q-ma-none" v-if="!localStore.isAuthenticated">
-        <q-btn unelevated stretch icon="home" size="md" to="/" />
-        <q-btn icon="settings" class="bg-transparent text-layout-text" unelevated stretch>
+      <q-toolbar
+        class="q-pa-none q-ma-none"
+        v-if="!localStore.isAuthenticated"
+      >
+        <q-btn
+          unelevated
+          stretch
+          icon="home"
+          size="md"
+          to="/"
+        />
+        <q-btn
+          icon="settings"
+          class="bg-transparent text-layout-text"
+          unelevated
+          stretch
+        >
           <q-menu class="bg-layout-bg no-shadow">
             <theme-selector />
           </q-menu>
@@ -71,7 +113,10 @@
           to="/login"
           :style="q.screen.gt.xs ? 'width: 140px' : 'width: 80px'"
         >
-          <q-tooltip class="bg-layout-bg text-layout-text" v-if="!q.screen.gt.xs">
+          <q-tooltip
+            class="bg-layout-bg text-layout-text"
+            v-if="!q.screen.gt.xs"
+          >
             <a class="text-body1">Login</a>
           </q-tooltip>
         </q-btn>
@@ -86,7 +131,10 @@
           size="md"
           :style="q.screen.gt.xs ? 'width: 140px' : 'width: 80px'"
         >
-          <q-tooltip class="bg-layout-bg text-layout-text" v-if="!q.screen.gt.xs">
+          <q-tooltip
+            class="bg-layout-bg text-layout-text"
+            v-if="!q.screen.gt.xs"
+          >
             <a class="text-body1">Register</a>
           </q-tooltip>
         </q-btn>
@@ -116,10 +164,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watchEffect, computed, watch } from 'vue';
+import { computed, onMounted, ref, watch, watchEffect } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import { useLocalStore } from 'stores/localStore';
-import { useRoute, useRouter } from 'vue-router';
 import NavigationDrawer from 'src/components/layout/NavigationDrawer.vue';
 import ThemeSelector from 'src/components/layout/ThemeSelector.vue';
 import UserMenu from 'src/components/layout/UserMenu.vue';

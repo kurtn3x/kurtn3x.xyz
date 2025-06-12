@@ -1,7 +1,7 @@
 <template>
   <div
     class="absolute-full flex flex-center bg-transparent"
-    v-if="loading"
+    v-if="filePreviewStore.loading"
   >
     <q-spinner
       color="primary"
@@ -9,14 +9,14 @@
     />
   </div>
   <div
-    v-if="!loading && error"
+    v-if="!filePreviewStore.loading && filePreviewStore.error"
     class="row justify-center q-mt-lg text-red text-h6"
   >
-    Couldn't load Text from File.
+    {{ filePreviewStore.errorMessage }}
   </div>
 
   <div
-    v-if="!loading && !error"
+    v-if="!filePreviewStore.loading && !filePreviewStore.error"
     class="col column"
   >
     <div
@@ -43,13 +43,13 @@
         <q-separator
           vertical
           color="layout-text"
-          v-if="lang == 'markdown'"
+          v-if="filePreviewStore.activeFile.mimeType == 'text/code-markdown'"
         />
         <q-btn
           :icon="markdownPreview ? 'visibility_off' : 'visibility'"
           flat
           @click="markdownPreview = !markdownPreview"
-          v-if="lang == 'markdown'"
+          v-if="filePreviewStore.activeFile.mimeType == 'text/code-markdown'"
         >
           <q-tooltip class="bg-layout-bg text-layout-text text-body2">Markdown Preview</q-tooltip>
         </q-btn>
@@ -74,11 +74,11 @@
                     Syntax
                   </q-item-label>
                   <q-option-group
-                    v-model="lang"
+                    :model-value="currentSyntax"
                     :options="langOptions"
                     color="light-blue-6"
                     class="q-mr-md q-mt-xs q-mb-xs"
-                    @update:model-value="updateSyntax"
+                    @update:model-value="(value) => updateSyntax(value)"
                   />
                 </q-item-section>
               </q-item>
@@ -114,9 +114,9 @@
           color="layout-text"
         />
         <q-btn
-          :icon="isDarkMode ? 'dark_mode' : 'light_mode'"
+          :icon="localStore.isDarkMode ? 'dark_mode' : 'light_mode'"
           flat
-          @click="isDarkMode = !isDarkMode"
+          @click="localStore.toggleDarkMode()"
         />
       </div>
     </div>
@@ -124,40 +124,31 @@
       bordered
       class="col column"
     >
-      <q-resize-observer
-        @resize="onResize"
-        :debounce="250"
-      />
       <q-scroll-area
-        :class="isDarkMode ? 'bg-one-dark text-white' : 'bg-white text-dark'"
-        :thumb-style="thumbStyle"
-        :bar-style="barStyle"
+        :class="localStore.isDarkMode ? 'bg-one-dark text-white' : 'bg-white text-dark'"
         class="col column"
         v-if="markdownPreview"
       >
         <vue-markdown
-          :source="text"
+          :source="filePreviewStore.activeFileContent"
           class="col column q-ml-md q-mb-md q-mt-md markdown-content"
           :options="options"
           :plugins="plugins"
         />
       </q-scroll-area>
       <q-scroll-area
-        :class="isDarkMode ? 'bg-one-dark text-white' : 'bg-white text-dark'"
-        :thumb-style="thumbStyle"
-        :bar-style="barStyle"
+        :class="localStore.isDarkMode ? 'bg-one-dark text-white' : 'bg-white text-dark'"
         class="col column"
         v-else
       >
         <codemirror
-          v-model="text"
+          v-model="filePreviewStore.activeFileContent"
           class="col column"
           placeholder="Write something..."
           :autofocus="true"
           :indent-with-tab="true"
           :tab-size="tabsize"
           :extensions="extensions"
-          @update="handleStateUpdate"
           @ready="handleReady"
           @keydown.ctrl.s.prevent.stop="updateContent"
         />
@@ -166,7 +157,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
@@ -177,18 +168,9 @@ import 'highlight.js/styles/github-dark.css';
 import MarkdownItHighlightjs from 'markdown-it-highlightjs';
 import { Codemirror } from 'vue-codemirror';
 import VueMarkdown from 'vue-markdown-render';
-import { computed, defineProps, onMounted, reactive, ref, shallowRef, watch } from 'vue';
-import { useQuasar } from 'quasar';
-import { apiGet, apiPut } from 'src/api/apiWrapper';
+import { computed, onMounted, ref, shallowRef } from 'vue';
 import { useLocalStore } from 'stores/localStore';
-
-const props = defineProps({
-  item: Object,
-  password: {
-    type: String,
-    default: '',
-  },
-});
+import { useFilePreviewStore } from 'src/stores/fileStores/filePreviewStore';
 
 const plugins = [MarkdownItHighlightjs];
 
@@ -199,222 +181,88 @@ const options = {
   typographer: true,
 };
 
-const item = computed(() => props.item);
-
-const q = useQuasar();
 const localStore = useLocalStore();
-const axiosConfig = {
-  withCredentials: true,
-  headers: {
-    'X-CSRFToken': q.cookies.get('csrftoken'),
-  },
-};
-var loading = ref(true);
-var error = ref(false);
+const filePreviewStore = useFilePreviewStore();
+
+// options / values
+const tabsize = ref(4);
+
+// markdown preview
+const markdownPreview = ref(false);
 
 // lang options
 const langmap = new Map();
-langmap.set('python', python());
-langmap.set('json', json());
-langmap.set('markdown', markdown());
-langmap.set('javascript', javascript());
+langmap.set('text/code-python', python());
+langmap.set('text/code-json', json());
+langmap.set('text/code-markdown', markdown());
+langmap.set('text/code-javascript', javascript());
+
 const langOptions = [
   {
     label: 'None',
-    value: '',
+    value: 'text/code',
   },
   {
     label: 'Python',
-    value: 'python',
+    value: 'text/code-python',
   },
   {
-    label: 'Json',
-    value: 'json',
+    label: 'JSON',
+    value: 'text/code-json',
   },
   {
-    label: 'Markdown',
-    value: 'markdown',
+    label: 'MarkDown',
+    value: 'text/code-markdown',
   },
   {
-    label: 'Javascript',
-    value: 'javascript',
+    label: 'JavaScript',
+    value: 'text/code-javascript',
   },
 ];
-// options / values
-var lang = ref('');
-var tabsize = ref(4);
-var text = ref('');
 
-// markdown preview
-var markdownPreview = ref(false);
+const currentSyntax = computed(() => {
+  const mimeType = filePreviewStore.activeFile.mimeType;
 
-watch(
-  () => props.item,
-  (newVal) => {
-    getFileContent();
-  },
-  { immediate: true },
-);
+  // Check if the current mimeType is in our supported options
+  const isSupported = langOptions.some((option) => option.value === mimeType);
 
-onMounted(async () => {
-  var els = document.getElementsByClassName('q-scrollarea__container');
-  for (var el of els) {
-    el.classList.add('column', 'col');
-  }
+  // If supported, return it; otherwise return the default "None" value
+  return isSupported ? mimeType : 'text/code';
 });
-
-// styling
-var thumbStyle = {
-  right: '4px',
-  borderRadius: '5px',
-  backgroundColor: '#0288d1',
-  width: '5px',
-  opacity: 0.75,
-};
-var barStyle = {
-  right: '2px',
-  borderRadius: '9px',
-  backgroundColor: '#4fc3f7',
-  width: '9px',
-  opacity: 0.2,
-};
-var isDarkMode = ref(localStore.isDarkMode);
 
 // codemirror options
 const extensions = computed(() => {
-  if (isDarkMode.value && lang.value == '') {
-    return [basicSetup, oneDark];
-  } else if (!isDarkMode.value && lang.value == '') {
-    return [basicSetup];
-  } else if (isDarkMode.value && lang.value != '') {
-    return [basicSetup, oneDark, langmap.get(lang.value)];
+  const baseExtensions = localStore.isDarkMode ? [basicSetup, oneDark] : [basicSetup];
+
+  // Check if the active file's mimeType has a corresponding language extension
+  const langExtension = langmap.get(filePreviewStore.activeFile.mimeType);
+
+  if (langExtension) {
+    return [...baseExtensions, langExtension];
   } else {
-    return [basicSetup, langmap.get(lang.value)];
+    return baseExtensions;
   }
 });
+
 const view = shallowRef();
-const handleReady = (payload) => {
+const handleReady = (payload: { view: any }) => {
   view.value = payload.view;
 };
 
-const state = reactive({
-  lines: null,
-  cursor: null,
-  selected: null,
-  length: null,
+async function updateContent() {
+  await filePreviewStore.updateFileContent(
+    filePreviewStore.activeFile.id,
+    filePreviewStore.activeFileContent,
+  );
+}
+
+async function updateSyntax(value: string) {
+  await filePreviewStore.updateFileMimeType(filePreviewStore.activeFile.id, value);
+}
+
+onMounted(async () => {
+  await filePreviewStore.getFileContent(filePreviewStore.activeFile.id);
 });
-
-const handleStateUpdate = (viewUpdate) => {
-  const ranges = viewUpdate.state.selection.ranges;
-  state.selected = ranges.reduce((plus, range) => plus + range.to - range.from, 0);
-  state.cursor = ranges[0].anchor;
-  state.length = viewUpdate.state.doc.length;
-  state.lines = viewUpdate.state.doc.lines;
-};
-
-// functions
-function getFileContent() {
-  const initialMime = item.value.mime;
-  if (['text/x-python', 'text/code-python'].indexOf(initialMime) > -1) {
-    lang.value = 'python';
-  } else if (
-    ['application/x-javascript', 'application/javascript', 'text/code-javascript'].indexOf(
-      initialMime,
-    ) > -1
-  ) {
-    lang.value = 'javascript';
-  } else if (['text/markdown', 'text/code-markdown'].indexOf(initialMime) > -1) {
-    lang.value = 'markdown';
-  } else if (['application/json', 'text/code-json'].indexOf(initialMime) > -1) {
-    lang.value = 'json';
-  } else {
-    lang.value = '';
-  }
-
-  if (!localStore.isAuthenticated && lang.value == 'markdown') {
-    markdownPreview.value = true;
-  } else {
-    markdownPreview.value = false;
-  }
-
-  var args = '';
-  if (props.password != '') {
-    args += '?password=' + props.password;
-  }
-  apiGet('/files/file-content/' + item.value.id + args, axiosConfig).then((apiData) => {
-    if (apiData.error == false) {
-      text.value = apiData.data.content;
-      loading.value = false;
-      error.value = false;
-    } else {
-      loading.value = false;
-      error.value = true;
-    }
-  });
-}
-
-function updateContent() {
-  if (!localStore.isAuthenticated) {
-    return;
-  }
-  var data = {
-    content: text.value,
-  };
-  apiPut('/files/file-content/' + item.value.id, data, axiosConfig).then((apiData) => {
-    if (apiData.error == false) {
-      q.notify({
-        type: 'positive',
-        message: 'Saved.',
-      });
-      apiGet('/files/file-content/' + item.value.id + '?only_size=1', axiosConfig).then(
-        (apiData) => {
-          if (apiData.error == false) {
-            item.value.size = apiData.data.size;
-            item.value.sizeBytes = apiData.data.sizeBytes;
-          } else {
-            q.notify({
-              type: 'negative',
-              message: apiData.errorMessage,
-            });
-          }
-        },
-      );
-    } else {
-      q.notify({
-        type: 'negative',
-        message: apiData.errorMessage,
-      });
-    }
-  });
-}
-
-function updateSyntax(syntax) {
-  var data = {
-    itemId: item.value.id,
-    mime: 'text/code' + (syntax != '' ? '-' + syntax : ''),
-  };
-  apiPut('/files/file/' + item.value.id, data, axiosConfig).then((apiData) => {
-    if (apiData.error == false) {
-      q.notify({
-        type: 'positive',
-        message: 'Saved.',
-      });
-      item.value.mime = data.mime;
-    } else {
-      q.notify({
-        type: 'negative',
-        message: apiData.errorMessage,
-      });
-    }
-  });
-}
-
-function onResize() {
-  var els = document.getElementsByClassName('q-scrollarea__container');
-  for (var el of els) {
-    el.classList.add('column', 'col');
-  }
-}
 </script>
 
 <style>

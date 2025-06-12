@@ -116,4 +116,6 @@ export function getIcon(mime: string) {
   }
 }
 
+export type MimeType = 'video' | 'image' | 'code' | 'pdf' | 'wysiwyg' | 'unknown';
+
 export { createTypes, mimeMap };

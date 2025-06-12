@@ -12,13 +12,81 @@
     </div>
 
     <!-- Filename column -->
-    <div class="file-name text-weight-bold">Name</div>
+    <div class="file-name text-weight-bold">
+      <q-item
+        dense
+        class="q-pa-none row items-center"
+        @click="filterStore.toggleSort('name')"
+        clickable
+        style="width: 80px"
+      >
+        <div class="q-ml-sm">Name</div>
+        <q-icon
+          v-if="filterStore.getSortIndicator('name')"
+          :name="
+            filterStore.getSortIndicator('name') === 'asc'
+              ? 'keyboard_arrow_up'
+              : 'keyboard_arrow_down'
+          "
+          size="16px"
+          class="q-ml-sm"
+        />
+      </q-item>
+    </div>
 
     <!-- Size column -->
-    <div class="file-size text-weight-bold">Size</div>
+    <div class="file-size text-weight-bold row justify-end">
+      <q-item
+        dense
+        class="q-pa-none row items-center justify-end"
+        @click="filterStore.toggleSort('sizeBytes')"
+        clickable
+        style="width: 70px"
+      >
+        <div
+          style="width: 20px"
+          class="q-mr-sm"
+        >
+          <q-icon
+            v-if="filterStore.getSortIndicator('sizeBytes')"
+            :name="
+              filterStore.getSortIndicator('sizeBytes') === 'asc'
+                ? 'keyboard_arrow_up'
+                : 'keyboard_arrow_down'
+            "
+            size="16px"
+          />
+        </div>
+        <div class="q-mr-sm">Size</div>
+      </q-item>
+    </div>
 
     <!-- Modified date column -->
-    <div class="file-date text-weight-bold">Modified</div>
+    <div class="file-date text-weight-bold row justify-end">
+      <q-item
+        dense
+        class="q-pa-none row items-center justify-end"
+        @click="filterStore.toggleSort('modifiedIso')"
+        clickable
+        style="width: 100px"
+      >
+        <div
+          style="width: 20px"
+          class="q-mr-sm"
+        >
+          <q-icon
+            v-if="filterStore.getSortIndicator('modifiedIso')"
+            :name="
+              filterStore.getSortIndicator('modifiedIso') === 'asc'
+                ? 'keyboard_arrow_up'
+                : 'keyboard_arrow_down'
+            "
+            size="16px"
+          />
+        </div>
+        <div class="q-mr-sm">Modified</div>
+      </q-item>
+    </div>
 
     <!-- Actions column -->
     <div class="file-actions">
@@ -27,6 +95,11 @@
   </div>
 </template>
 
+<script setup lang="ts">
+import { useFilterStore } from 'src/stores/fileStores/filterStore';
+
+const filterStore = useFilterStore();
+</script>
 <style scoped>
 .file-checkbox {
   width: 40px;
@@ -46,6 +119,7 @@
   width: 115px;
   min-width: 115px;
   text-align: left !important;
+
   white-space: nowrap;
   overflow: hidden;
 }
@@ -106,6 +180,7 @@
     grid-template-columns: 40px 35px minmax(100px, 1fr) 50px;
   }
 
+  .file-name,
   .file-size,
   .file-date {
     display: none;

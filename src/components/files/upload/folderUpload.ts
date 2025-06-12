@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useFileOperationsStore } from 'src/stores/fileStores/fileOperationsStore';
 import { generateUniqueUploadId } from 'src/components/lib/functions';
+import { useChunkedUpload } from './chunkedUpload';
 import type {
   AnyTrackerNode,
   ChunkedUploadProgressEntry,
@@ -9,13 +10,20 @@ import type {
   FolderUploadProgressEntry,
   RegularUploadProgressEntry,
 } from 'src/types/localTypes';
-import { isFileTrackerNode, isFolderTrackerNode, UploadStatus } from 'src/types/localTypes';
+import {
+  isChunkedUpload,
+  isFileTrackerNode,
+  isFolderTrackerNode,
+  isRegularUpload,
+  UploadStatus,
+} from 'src/types/localTypes';
 
 const CHUNKED_UPLOAD_THRESHOLD = 50 * 1024 * 1024; // 50MB
 const activeTrackingIntervals = new Set<NodeJS.Timeout>();
 
 export function useFolderUpload() {
   const fileOps = useFileOperationsStore();
+  const chunkedUpload = useChunkedUpload();
 
   /**
    * Initialize the folder structure for upload
@@ -38,8 +46,6 @@ export function useFolderUpload() {
 
       const allNodes: AnyTrackerNode[] = [rootNode];
 
-      // Don't call createFlatStructure with the root directory itself
-      // Instead, read its contents and process each child
       const directoryEntry = upload.content;
 
       // Read the root directory contents
@@ -90,7 +96,7 @@ export function useFolderUpload() {
     try {
       // Filter only folder nodes and sort by depth
       const folderNodes = upload.nodes
-        .filter(isFolderTrackerNode) // Type-safe filtering
+        .filter(isFolderTrackerNode)
         .sort((a, b) => a.depth - b.depth);
 
       if (folderNodes.length === 0) {
@@ -121,7 +127,7 @@ export function useFolderUpload() {
             parentId = parentNode.remoteId;
           }
 
-          const result = await fileOps.createFolder(folderNode.name, parentId);
+          const result = await fileOps.createFolder(folderNode.name, parentId, false);
 
           if (result.successful && result.data?.id) {
             folderNode.created = true;
@@ -176,7 +182,6 @@ export function useFolderUpload() {
             return false;
           }
 
-          // Type-safe assignment based on parent type
           if (isFolderTrackerNode(parentNode)) {
             (node as any).parentRemoteId = parentNode.remoteId!;
           }
@@ -249,11 +254,6 @@ export function useFolderUpload() {
         readEntries();
       });
 
-      console.log(
-        `[DEBUG] Directory ${entry.name} contains ${entries.length} entries:`,
-        entries.map((e) => e.name),
-      );
-
       // Recursively process all entries with incremented depth
       for (const childEntry of entries) {
         const childNodes = await createFlatStructure(childEntry, folderNode.localId, depth + 1);
@@ -321,6 +321,149 @@ export function useFolderUpload() {
     return uploadEntries;
   }
 
+  async function cancelFolderUpload(upload: FolderUploadProgressEntry): Promise<void> {
+    // Don't cancel if folders haven't been created yet
+    if (!upload.foldersInitialized) {
+      return;
+    }
+
+    // Cancel all file uploads in the folder
+    const cancelPromises: Promise<void>[] = [];
+
+    upload.nodeProgressTypeMap.forEach((fileUpload) => {
+      if (
+        fileUpload.status === UploadStatus.QUEUED ||
+        fileUpload.status === UploadStatus.UPLOADING
+      ) {
+        fileUpload.status = UploadStatus.CANCELED;
+        fileUpload.message = 'Canceled by user';
+
+        // Handle different upload types
+        if (isRegularUpload(fileUpload)) {
+          // Regular upload - use cancel token
+          fileUpload.cancelToken.cancel('Upload canceled by user');
+        } else if (isChunkedUpload(fileUpload)) {
+          cancelPromises.push(chunkedUpload.cancelUpload(fileUpload));
+        }
+      }
+    });
+
+    // Wait for all chunked upload cancellations to complete
+    if (cancelPromises.length > 0) {
+      await Promise.all(cancelPromises);
+    }
+
+    // Update folder status
+    upload.status = UploadStatus.CANCELED;
+    upload.message = 'Folder upload canceled';
+  }
+
+  async function retryFolderUpload(upload: FolderUploadProgressEntry): Promise<{
+    success: boolean;
+    fileEntries?: (RegularUploadProgressEntry | ChunkedUploadProgressEntry)[];
+  }> {
+    try {
+      // Reset upload status
+      upload.status = UploadStatus.PREPARING;
+      upload.uploadedBytes = 0;
+
+      // If structure initialization failed, retry everything
+      if (!upload.structureInitialized) {
+        upload.message = 'Retrying folder processing...';
+
+        // Clear existing nodes and start over
+        upload.nodes = [];
+        upload.nodeProgressTypeMap.clear();
+
+        const structureSuccess = await initializeStructure(upload);
+        if (!structureSuccess) {
+          upload.status = UploadStatus.FAILED;
+          upload.message = 'Failed to initialize folder structure';
+          return { success: false };
+        }
+        upload.structureInitialized = true;
+      }
+
+      // If folder initialization failed, retry folder creation and file uploads
+      if (!upload.foldersInitialized) {
+        console.log(`[DEBUG] Retrying folder creation for: ${upload.name}`);
+        upload.message = 'Retrying folder creation...';
+
+        // Reset folder creation status for retry
+        upload.nodes.forEach((node) => {
+          if (isFolderTrackerNode(node)) {
+            node.created = false;
+            node.remoteId = null;
+          }
+        });
+
+        const folderSuccess = await initializeFolders(upload);
+        if (!folderSuccess) {
+          upload.status = UploadStatus.FAILED;
+          upload.message = 'Failed creating folder structure';
+          return { success: false };
+        }
+        upload.foldersInitialized = true;
+
+        const assignSuccess = assignRemoteParentIds(upload);
+        if (!assignSuccess) {
+          upload.status = UploadStatus.FAILED;
+          upload.message = 'Failed assigning folders';
+          return { success: false };
+        }
+
+        // Clear and recreate file upload entries
+        upload.nodeProgressTypeMap.clear();
+        const fileUploadEntries = createFileUploadEntries(upload);
+
+        // Set status to uploading and let the tracking handle the rest
+        upload.status = UploadStatus.UPLOADING;
+        upload.message = 'Retrying file uploads...';
+
+        return { success: true, fileEntries: fileUploadEntries }; // Return true and let upload store add the file entries to queue
+      }
+
+      // If only file uploads failed, retry just the failed files
+      upload.message = 'Retrying failed file uploads...';
+      upload.status = UploadStatus.UPLOADING;
+
+      let hasFailedFiles = false;
+      upload.nodeProgressTypeMap.forEach((fileUpload) => {
+        if (fileUpload.status === UploadStatus.FAILED) {
+          hasFailedFiles = true;
+          // Reset file upload status
+          fileUpload.status = UploadStatus.QUEUED;
+          fileUpload.message = 'Queued for retry...';
+          fileUpload.uploadedBytes = 0;
+
+          // Reset chunks if it's a chunked upload
+          if ('chunks' in fileUpload) {
+            fileUpload.chunks = [];
+            delete (fileUpload as any).sessionInfo;
+          }
+
+          // Reset cancel token if it's a regular upload
+          if ('cancelToken' in fileUpload) {
+            fileUpload.cancelToken = axios.CancelToken.source();
+          }
+        }
+      });
+
+      if (!hasFailedFiles) {
+        upload.status = UploadStatus.COMPLETED;
+        upload.message = 'All files already completed';
+        return { success: true };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Failed to retry folder upload ${upload.name}:`, error);
+      upload.status = UploadStatus.FAILED;
+      upload.message = error.message || 'Retry failed';
+      return { success: false };
+    }
+  }
+
   interface FolderTrackingCallbacks {
     onProgress?: (completed: number, total: number, failed: number, canceled: number) => void;
     onComplete?: (
@@ -373,6 +516,24 @@ export function useFolderUpload() {
 
       // Check if all files are finished
       if (finishedFiles === totalFiles) {
+        if (canceledUploads.length > 0 && completedUploads.length === 0) {
+          // All files were canceled
+          folderUpload.status = UploadStatus.CANCELED;
+          folderUpload.message = 'Folder upload canceled';
+        } else if (failedUploads.length > 0 && completedUploads.length === 0) {
+          // All files failed
+          folderUpload.status = UploadStatus.FAILED;
+          folderUpload.message = `All ${failedUploads.length} files failed to upload`;
+        } else if (failedUploads.length > 0) {
+          // Some files failed, some succeeded
+          folderUpload.status = UploadStatus.COMPLETED;
+          folderUpload.message = `${completedUploads.length}/${totalFiles} files uploaded successfully, ${failedUploads.length} failed`;
+        } else {
+          // All files completed successfully
+          folderUpload.status = UploadStatus.COMPLETED;
+          folderUpload.message = `All ${completedUploads.length} files uploaded successfully`;
+        }
+
         // Clean up file references before calling completion callback
         cleanupFolderFileReferences(folderUpload);
 
@@ -444,6 +605,8 @@ export function useFolderUpload() {
     initializeFolders,
     assignRemoteParentIds,
     createFileUploadEntries,
+    cancelFolderUpload,
+    retryFolderUpload,
   };
 }
 

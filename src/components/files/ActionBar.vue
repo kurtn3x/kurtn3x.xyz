@@ -11,6 +11,17 @@
   <q-dialog v-model="showUploadFilesDialog">
     <UploadItemsDialog />
   </q-dialog>
+
+  <q-dialog
+    v-model="fileStore.filter.filterDialog"
+    seamless
+    :position="dialogPosition"
+    :full-width="false"
+    no-focus
+    allow-focus-outside
+  >
+    <FilterDialog />
+  </q-dialog>
   <q-toolbar class="q-mt-sm">
     <q-checkbox
       v-model="fileStore.selection.allSelected"
@@ -70,6 +81,7 @@
 
       <q-input
         :color="localStore.isDarkMode ? 'white' : 'black'"
+        v-if="!localStore.isSmallWidth"
         v-model="fileStore.filter.filterSearch"
         input-class="text-left"
         label="Search"
@@ -78,11 +90,40 @@
         dense
         style="max-width: 400px"
       />
+      <q-fab
+        push
+        icon="settings"
+        direction="down"
+        class="q-ml-md"
+        color="indigo"
+        padding="none"
+        style="height: 40px; width: 40px; z-index: 3"
+      >
+        <q-fab-action
+          outline
+          class="text-body1 bg-indigo"
+          text-color="white"
+          icon="tune"
+          label="Filter / Sort"
+          @click="fileStore.filter.toggleFilterDialog()"
+          style="width: 180px; z-index: 3"
+        />
+        <q-fab-action
+          push
+          @click="fileStore.upload.toogleProgressDialog()"
+          icon="file_upload"
+          label="Show Uploads"
+          class="text-body1 bg-indigo"
+          text-color="white"
+          style="width: 180px; z-index: 3"
+          outline
+        />
+      </q-fab>
 
       <q-space />
       <div
         style="width: 130px"
-        class="q-ml-md q-mr-sm"
+        class="q-ml-md q-mr-md"
       >
         <q-fab
           push
@@ -120,10 +161,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useFileStore } from 'src/stores/fileStore';
 import { useLocalStore } from 'src/stores/localStore';
 import DeleteItemsDialog from './dialogs/DeleteItemsDialog.vue';
+import FilterDialog from './dialogs/FilterDialog.vue';
 import MoveItemsDialog from './dialogs/MoveItemsDialog.vue';
 import UploadItemsDialog from './dialogs/UploadItemsDialog.vue';
 
@@ -133,4 +175,9 @@ const fileStore = useFileStore();
 const showMoveItemsDialog = ref(false);
 const showDeleteItemsDialog = ref(false);
 const showUploadFilesDialog = ref(false);
+
+// Avatar on bottom for smaller screens (such as mobile) to avoid covering the toolbar
+const dialogPosition = computed(() => {
+  return localStore.isSmallWidth ? 'right' : 'bottom';
+});
 </script>

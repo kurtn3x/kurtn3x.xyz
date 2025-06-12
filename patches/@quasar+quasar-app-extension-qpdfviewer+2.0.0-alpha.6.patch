@@ -1,0 +1,13 @@
+diff --git a/node_modules/@quasar/quasar-app-extension-qpdfviewer/src/index.js b/node_modules/@quasar/quasar-app-extension-qpdfviewer/src/index.js
+index 6c52a81..96f2029 100644
+--- a/node_modules/@quasar/quasar-app-extension-qpdfviewer/src/index.js
++++ b/node_modules/@quasar/quasar-app-extension-qpdfviewer/src/index.js
+@@ -25,7 +25,7 @@ module.exports = function (api) {
+   api.compatibleWith('quasar', '^2.0.0')
+ 
+   if (api.hasVite === true) {
+-    api.compatibleWith('@quasar/app-vite', '^1.0.0-alpha.0')
++    api.compatibleWith('@quasar/app-vite', '^2.0.0-alpha.0')
+   }
+   else {
+     // should be "@quasar/app-webpack" but that is not backward compatible

@@ -84,7 +84,7 @@ const localPassword = ref('');
 async function setPassword() {
   const successful = await fileStore.fileOps.updateSharingPassword(props.propItem.id, {
     isPasswordProtected: true,
-    sharedPassword: localPassword.value,
+    password: localPassword.value,
   });
   if (successful) {
     localPassword.value = '';
