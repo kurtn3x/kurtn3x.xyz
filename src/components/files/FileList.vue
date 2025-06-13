@@ -558,6 +558,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* Set "column col" classes deep inside the container, otherwise its a buggy mess */
+.q-scrollarea :deep(.q-scrollarea__container) {
+  flex: 1 1 0%;
+  flex-direction: column;
+  display: flex;
+}
+
 .is-dragging {
   opacity: 0.5;
 }

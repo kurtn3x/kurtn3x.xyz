@@ -3,6 +3,7 @@
   <q-page-sticky
     v-if="uploadStore.showProgressDialog && !localStore.isSmallWidth"
     position="bottom-right"
+    style="z-index: 2"
   >
     <q-card
       bordered

@@ -24,7 +24,6 @@
           "
           style="width: 57px"
         />
-
         <q-btn
           round
           v-if="nodeEnv === 'development'"
@@ -98,7 +97,36 @@
           stretch
         >
           <q-menu class="bg-layout-bg no-shadow">
-            <theme-selector />
+            <ThemeSelector />
+          </q-menu>
+        </q-btn>
+        <q-btn
+          round
+          v-if="nodeEnv === 'development'"
+          color="red"
+          icon="bug_report"
+          size="md"
+        >
+          <q-menu>
+            <q-list style="min-width: 200px">
+              <q-item>
+                <q-item-section>
+                  <q-toggle
+                    v-model="debugMode"
+                    label="DEBUG"
+                    color="primary"
+                  />
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                clickable
+                v-close-popup
+                @click="resetLocalStorage"
+              >
+                <q-item-section>Reset LocalStorage</q-item-section>
+              </q-item>
+            </q-list>
           </q-menu>
         </q-btn>
 
@@ -197,7 +225,6 @@ const miniState = ref(true);
 
 // Reference to process.env for the template
 const nodeEnv = process.env.NODE_ENV;
-
 // Reset function for localStorage
 const resetLocalStorage = async () => {
   await localStore.clearAll();

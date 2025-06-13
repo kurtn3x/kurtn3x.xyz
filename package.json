@@ -12,7 +12,7 @@
     "test": "echo \"No test specified\" && exit 0",
     "dev": "quasar dev",
     "build": "quasar build",
-    "postinstall": "quasar prepare && patch-package"
+    "postinstall": "patch-package && quasar prepare"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",
